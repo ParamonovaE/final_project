@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/register.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h2>Регистрация</h2>
+        <form id="register-form" novalidate autocomplete="off">
+            <label for="first_name">Имя</label>
+            <input type="text" id="first_name" placeholder="Имя" required autocomplete="off">
+            <span class="error-message" id="first_name-error"></span>
+
+            <label for="last_name">Фамилия</label>
+            <input type="text" id="last_name" placeholder="Фамилия" required autocomplete="off">
+            <span class="error-message" id="last_name-error"></span>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="Email" required autocomplete="off">
+            <span class="error-message" id="email-error"></span>
+
+            <label for="password">Пароль</label>
+            <input type="password" id="password" placeholder="Пароль" required autocomplete="new-password">
+            <span class="error-message" id="password-error"></span>
+
+            <button type="submit">Зарегистрироваться</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("register-form").addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            let email = document.getElementById("email").value;
+            let first_name = document.getElementById("first_name").value;
+            let last_name = document.getElementById("last_name").value;
+            let password = document.getElementById("password").value;
+
+            document.querySelectorAll(".error-message").forEach(el => el.innerText = "");
+
+            fetch("/register/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    email: email,
+                    first_name: first_name,
+                    last_name: last_name,
+                    password: password
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw data;
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(errors => {
+                if (typeof errors === "object") {
+                    if (errors.email) {
+                        document.getElementById("email-error").innerText = errors.email.join(" ");
+                        document.getElementById("email-error").style.color = "red";
+                    }
+                    if (errors.first_name) {
+                        document.getElementById("first_name-error").innerText = errors.first_name.join(" ");
+                    }
+                    if (errors.last_name) {
+                        document.getElementById("last_name-error").innerText = errors.last_name.join(" ");
+                    }
+                    if (errors.password) {
+                        document.getElementById("password-error").innerText = errors.password.join(" ");
+                    }
+                } else {
+                    alert("Ошибка сервера. Попробуйте позже.");
+                }
+            });
+        });
+    </script>
+</body>
+</html>
