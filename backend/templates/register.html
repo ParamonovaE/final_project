@@ -27,6 +27,13 @@
             <input type="password" id="password" placeholder="Пароль" required autocomplete="new-password">
             <span class="error-message" id="password-error"></span>
 
+            <label for="role">Выберите роль</label>
+            <select id="role">
+                <option value="customer">Покупатель</option>
+                <option value="shop">Поставщик</option>
+            </select>
+            <span class="error-message" id="role-error"></span>
+
             <button type="submit">Зарегистрироваться</button>
         </form>
     </div>
@@ -39,6 +46,7 @@
             let first_name = document.getElementById("first_name").value;
             let last_name = document.getElementById("last_name").value;
             let password = document.getElementById("password").value;
+            let role = document.getElementById("role").value;
 
             document.querySelectorAll(".error-message").forEach(el => el.innerText = "");
 
@@ -51,7 +59,8 @@
                     email: email,
                     first_name: first_name,
                     last_name: last_name,
-                    password: password
+                    password: password,
+                    role: role
                 })
             })
             .then(response => {
@@ -79,6 +88,9 @@
                     }
                     if (errors.password) {
                         document.getElementById("password-error").innerText = errors.password.join(" ");
+                    }
+                    if (errors.role) {
+                        document.getElementById("role-error").innerText = errors.role.join(" ");
                     }
                 } else {
                     alert("Ошибка сервера. Попробуйте позже.");

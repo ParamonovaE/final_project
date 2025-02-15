@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление товарами</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/shop.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h2>Управление товарами</h2>
+        <div class="actions">
+            <button id="upload-btn">Загрузить товары</button>
+        </div>
+        <input type="file" id="file-input" style="display: none;">
+
+        <div id="products-container">
+            <h3>Ваши товары</h3>
+            <ul id="product-list"></ul>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const uploadBtn = document.getElementById("upload-btn");
+            const fileInput = document.getElementById("file-input");
+            const productList = document.getElementById("product-list");
+
+            function loadProducts() {
+                const token = localStorage.getItem("token");
+
+                fetch("/api/shop/products/", {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Token ${token}`,
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => {
+                    if (response.status === 401) {
+                        alert("Ошибка авторизации. Войдите в аккаунт.");
+                        window.location.href = "/login/";
+                        return;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        productList.innerHTML = "";
+                        if (!Array.isArray(data) || data.length === 0) {
+                            uploadBtn.style.display = "block"; // показываем кнопку загрузки, если товаров нет
+                        } else {
+                            uploadBtn.style.display = "none"; // скрываем кнопку загрузки, если товары есть
+                            data.forEach(product => {
+                                const li = document.createElement("li");
+                                li.classList.add("product-item");
+                                li.innerHTML = `
+                                    <div class="product-header">
+                                        <h3 class="product-name">${product.name}</h3>
+                                        <span class="product-price">${product.price} руб.</span>
+                                    </div>
+                                    <div class="product-details">
+                                        <p class="product-shop"><strong>Поставщик:</strong> ${product.shop || "Не указано"}</p>
+                                        <div class="product-specs">
+                                            <strong>Характеристики:</strong>
+                                            <ul>
+                                                ${product.parameters.map(param => `
+                                                    <li>
+                                                        <label for="param-${param.id}">${param.name}:</label>
+                                                        <input type="text" id="param-${param.id}" name="param-${param.id}" value="${param.value}">
+                                                    </li>
+                                                `).join("") || "Нет характеристик"}
+                                            </ul>
+                                        </div>
+                                        <p class="product-quantity"><strong>Количество:</strong> ${product.quantity}</p>
+
+                                        <!-- Форма для обновления товара -->
+                                        <form class="update-product-form" data-product-id="${product.id}">
+                                            <label for="price-${product.id}">Цена:</label>
+                                            <input type="number" id="price-${product.id}" name="price" value="${product.price}" step="0.01" required>
+
+                                            <label for="quantity-${product.id}">Количество:</label>
+                                            <input type="number" id="quantity-${product.id}" name="quantity" value="${product.quantity}" required>
+
+                                            <button type="submit">Обновить</button>
+                                        </form>
+                                    </div>
+                                `;
+                                productList.appendChild(li);
+                            });
+
+                            const updateForms = document.querySelectorAll(".update-product-form");
+                            updateForms.forEach(form => {
+                                form.addEventListener("submit", function (event) {
+                                    event.preventDefault();
+
+                                    const productId = form.getAttribute("data-product-id");
+                                    const price = form.querySelector("input[name='price']").value;
+                                    const quantity = form.querySelector("input[name='quantity']").value;
+
+                                    const parameters = [];
+                                    form.querySelectorAll("input[type='text']").forEach(input => {
+                                        const paramId = input.id.replace("param-", "");
+                                        const paramName = input.previousElementSibling.textContent.replace(":", "").trim();
+                                        const paramValue = input.value;
+                                        parameters.push({
+                                            id: paramId,
+                                            name: paramName,
+                                            value: paramValue,
+                                        });
+                                    });
+
+                                    fetch(`/api/shop/products/${productId}/`, {
+                                        method: "PUT",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Token ${token}`,
+                                        },
+                                        body: JSON.stringify({
+                                            price: parseFloat(price),
+                                            quantity: parseInt(quantity),
+                                            parameters: parameters,
+                                        }),
+                                    })
+                                    .then(response => {
+                                        if (response.ok) {
+                                            alert("Товар успешно обновлён!");
+                                            loadProducts();
+                                        } else {
+                                            alert("Ошибка при обновлении товара.");
+                                        }
+                                    })
+                                    .catch(error => {
+                                        console.error("Ошибка:", error);
+                                        alert("Ошибка при обновлении товара.");
+                                    });
+                                });
+                            });
+                        }
+                    }
+                })
+                .catch(error => console.error("Ошибка загрузки товаров", error));
+            }
+
+            uploadBtn.addEventListener("click", function () {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener("change", function (event) {
+                const file = event.target.files[0];
+                if (file) {
+                    handleFileUpload(file);
+                }
+            });
+
+            function handleFileUpload(file) {
+                const token = localStorage.getItem("token");
+                const formData = new FormData();
+                formData.append("file", file);
+
+                fetch("/api/shop/products/", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Token ${token}`
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.status || data.error);
+                    loadProducts();
+                })
+                .catch(error => console.error("Ошибка загрузки", error));
+            }
+
+            loadProducts();
+        });
+    </script>
+</body>
+</html>

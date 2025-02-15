@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная страница</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/main_depends_role.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h2>Добро пожаловать, <span id="username">{{ user.first_name }}</span>!</h2>
+        <p>Ваша роль: <span id="user-role">{{ user.role }}</span></p>
+
+        <div id="customer-section" style="display: none;">
+            <h3>Вы покупатель</h3>
+            <!-- <a href="/shop/">Перейти в каталог товаров</a>
+            <a href="/orders/">Мои заказы</a> -->
+        </div>
+
+        <div id="shop-section" style="display: none;">
+            <h3>Вы поставщик</h3>
+            <a href="/shop-products/">Управление товарами</a>
+        </div>
+    </div>
+
+    <script>
+        let userRole = "{{ user.role }}";
+
+        if (userRole === "customer") {
+            document.getElementById("customer-section").style.display = "block";
+        } else if (userRole === "shop") {
+            document.getElementById("shop-section").style.display = "block";
+        }
+    </script>
+</body>
+</html>

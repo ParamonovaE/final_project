@@ -1,18 +1,30 @@
 import smtplib
+from django.contrib.auth import login
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from django.shortcuts import render
 from django.utils.encoding import force_str, force_bytes
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import IsAuthenticated
 from .serializers import RegisterSerializer, LoginSerializer
-from backend.models import User
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from backend.models import User, Category
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from rest_framework import status
 from rest_framework.authtoken.models import Token
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+import yaml
+from .models import Product, ProductInfo, Parameter, ProductParameter, Shop
+from .permissions import IsSupplier
+
+@login_required
+def main_depends_role(request):
+    return render(request, "main_depends_role.html", {"user": request.user})
 
 # регистрация
 class RegisterView(APIView):
@@ -55,11 +67,15 @@ class VerifyEmailView(APIView):
                 user = User.objects.create(
                     email=email,
                     first_name=temp_user["first_name"],
-                    last_name=temp_user["last_name"]
+                    last_name=temp_user["last_name"],
+                    role=temp_user["role"]
                 )
                 user.set_password(temp_user["password"])
                 user.is_active = True
                 user.save()
+
+                # автоматически авторизуем пользователя после подтверждения email
+                login(request, user)
 
                 # удаляем токен из кэша после подтверждения
                 cache.delete(f"email_verify_{uid}")
@@ -86,7 +102,9 @@ class LoginAccount(APIView):
         user = serializer.validated_data["user"]
         token, _ = Token.objects.get_or_create(user=user)
 
-        return Response({'status': True, 'token': token.key}, status=status.HTTP_200_OK)
+        login(request, user)
+
+        return Response({'status': True, 'token': token.key, 'role': user.role}, status=status.HTTP_200_OK)
 
 # сброс пароля
 class ResetPasswordView(APIView):
@@ -153,3 +171,105 @@ class ResetPasswordConfirmView(APIView):
         cache.delete(f"password_reset_{uid}")
 
         return Response({"message": "Пароль успешно изменён. Теперь вы можете войти."}, status=status.HTTP_200_OK)
+
+@login_required(login_url="/login/")
+def shop_products_view(request):
+    return render(request, "shop-products.html", {"user": request.user})
+
+# импорт, получение и обновление товаров магазина
+class ShopProductView(APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated, IsSupplier]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]  # поддержка загрузки файлов
+
+    # получение списка товаров магазина
+    def get(self, request, *args, **kwargs):
+        shop = Shop.objects.filter(user=request.user).first()
+        if not shop:
+            return Response({"error": "Магазин не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        products = ProductInfo.objects.filter(shop=shop).prefetch_related('parameters')
+        product_data = []
+
+        for product in products:
+            parameters = [
+                {"name": param.parameter.name, "value": param.value}
+                for param in product.parameters.all()
+            ]
+            shop_name = product.shop.name if product.shop else "Не указано"
+            product_data.append({
+                "id": product.id,
+                "name": product.product.name,
+                "price": product.price,
+                "quantity": product.quantity,
+                "parameters": parameters,  # передаём параметры как массив объектов
+                "shop": shop_name
+            })
+        return Response(product_data, status=status.HTTP_200_OK)
+
+    # загрузка товаров из файла
+    def post(self, request, *args, **kwargs):
+        print("Файл пришёл:", request.FILES)
+        file = request.FILES.get("file")  # получаем загруженный файл
+        if not file:
+            return Response({"error": "Файл не найден"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            data = yaml.safe_load(file.read())  # читаем YAML-файл
+            print("Файл прочитан:", data)
+        except Exception as e:
+            return Response({"error": "Ошибка обработки файла"}, status=status.HTTP_400_BAD_REQUEST)
+
+        shop, _ = Shop.objects.get_or_create(name=data["shop"], defaults={"user": request.user})
+
+        for category in data["categories"]:
+            category_obj, _ = Category.objects.get_or_create(id=category["id"], defaults={"name": category["name"]})
+            category_obj.shops.add(shop)  # привязываем категорию к магазину
+
+        for item in data["goods"]:
+            product, _ = Product.objects.get_or_create(name=item["name"])
+            category_obj = Category.objects.get(id=item["category"])
+            product.categories.add(category_obj)  # привязываем продукт к категории
+
+            product_info, _ = ProductInfo.objects.update_or_create(
+                product=product,
+                shop=shop,
+                external_id=item["id"],
+                defaults={
+                    "price": item["price"],
+                    "price_rrc": item["price_rrc"],
+                    "quantity": item["quantity"],
+                }
+            )
+
+            for name, value in item["parameters"].items():
+                parameter, _ = Parameter.objects.get_or_create(name=name)
+                ProductParameter.objects.update_or_create(
+                    product_info=product_info, parameter=parameter, defaults={"value": value}
+                )
+
+        return Response({"status": "Товары успешно загружены"}, status=status.HTTP_201_CREATED)
+
+    # обновление информации о товаре
+    def put(self, request, product_id, *args, **kwargs):
+        try:
+            product = ProductInfo.objects.get(id=product_id, shop__user=request.user)
+        except ProductInfo.DoesNotExist:
+            return Response({"error": "Товар не найден"}, status=status.HTTP_404_NOT_FOUND)
+
+        # обновляем цену и количество
+        product.price = request.data.get("price", product.price)
+        product.quantity = request.data.get("quantity", product.quantity)
+        product.save()
+
+        # обновляем характеристики
+        parameters = request.data.get("parameters", [])
+        for param_data in parameters:
+            try:
+                param = ProductParameter.objects.get(id=param_data["id"], product_info=product)
+                param.value = param_data["value"]
+                param.save()
+            except ProductParameter.DoesNotExist:
+                continue
+
+        return Response({"status": "Товар успешно обновлён"}, status=status.HTTP_200_OK)

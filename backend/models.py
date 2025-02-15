@@ -1,9 +1,50 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email обязателен!")
+        email = self.normalize_email(email)
+        extra_fields.setdefault("is_active", False)  # по умолчанию пользователь не активен (ждёт подтверждения)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        return self.create_user(email, password, **extra_fields)
+
+class User(AbstractUser):
+    ROLE_CHOICES = (
+        ('customer', 'Покупатель'),
+        ('shop', 'Магазин'),
+    )
+    username = None
+    email = models.EmailField(unique=True, verbose_name="Email")
+    is_active = models.BooleanField(default=False, verbose_name="Подтверждён")  # подтверждение регистрации
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='customer', verbose_name="Роль")
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
+
+    objects = UserManager()
+
+    class Meta:
+        verbose_name = 'Пользователь'
+        verbose_name_plural = "Список пользователей"
+
+    def __str__(self):
+        return f'{self.first_name} {self.last_name}'
+
 class Shop(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Название магазина")
-    url = models.URLField(max_length=300, unique=True, help_text="Введите полный URL, включая https://")
+    url = models.URLField(max_length=300, unique=True, help_text="Введите полный URL, включая https://", null=True, blank=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="shop", verbose_name="Пользователь", null=True, blank=True)
 
     class Meta:
         verbose_name = 'Магазин'
@@ -13,7 +54,7 @@ class Shop(models.Model):
         return self.name
 
 class Category(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Название категории")
+    name = models.CharField(max_length=100, verbose_name="Название категории")
     shops = models.ManyToManyField(Shop, related_name='categories')
 
     class Meta:
@@ -24,7 +65,7 @@ class Category(models.Model):
         return self.name
 
 class Product(models.Model):
-    name = models.CharField(max_length=100, unique=True, verbose_name="Название продукта")
+    name = models.CharField(max_length=100, verbose_name="Название продукта")
     categories = models.ManyToManyField(Category, related_name='products')
 
     class Meta:
@@ -64,7 +105,7 @@ class Parameter(models.Model):
         return self.name
 
 class ProductParameter(models.Model):
-    product_info = models.ForeignKey(ProductInfo, related_name="product_infos", on_delete=models.CASCADE, verbose_name='Информация о продукте')
+    product_info = models.ForeignKey(ProductInfo, related_name="parameters", on_delete=models.CASCADE, verbose_name='Информация о продукте')
     parameter = models.ForeignKey(Parameter, related_name="product_parameters", on_delete=models.CASCADE, verbose_name="Параметр")
     value = models.CharField(max_length=255, verbose_name="Значение параметра")
 
@@ -77,41 +118,6 @@ class ProductParameter(models.Model):
 
     def __str__(self):
         return f"{self.parameter.name}: {self.product_info.product.name} {self.value} "
-
-class UserManager(BaseUserManager):
-    use_in_migrations = True
-
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError("Email обязателен!")
-        email = self.normalize_email(email)
-        extra_fields.setdefault("is_active", False)  # по умолчанию пользователь не активен (ждёт подтверждения)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save(using=self._db)
-        return user
-
-    def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-        return self.create_user(email, password, **extra_fields)
-
-class User(AbstractUser):
-    username = None
-    email = models.EmailField(unique=True, verbose_name="Email")
-    is_active = models.BooleanField(default=False, verbose_name="Подтверждён")  # подтверждение регистрации
-
-    USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = []
-
-    objects = UserManager()
-
-    class Meta:
-        verbose_name = 'Пользователь'
-        verbose_name_plural = "Список пользователей"
-
-    def __str__(self):
-        return f'{self.first_name} {self.last_name}'
 
 class Order(models.Model):
     STATUS_CHOICES = [

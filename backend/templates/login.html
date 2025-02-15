@@ -51,7 +51,7 @@
                     localStorage.setItem("token", body.token);
                     document.getElementById("message").innerText = "Вход выполнен!";
                     setTimeout(() => {
-                        window.location.href = "/";
+                        window.location.href = "/main_depends/";
                     }, 2000);
                 } else {
                     if (body.error) {

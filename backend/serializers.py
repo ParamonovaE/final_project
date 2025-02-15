@@ -5,10 +5,12 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from backend.models import User
+from backend.models import User, Category
 from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import check_password
+from rest_framework import serializers
+from .models import Product, ProductInfo, Parameter, ProductParameter, Shop
 
 # функции валидации
 
@@ -51,6 +53,8 @@ class RegisterSerializer(serializers.Serializer):
     last_name = serializers.CharField(max_length=30, validators=[validate_no_special_characters])
     email = serializers.EmailField(validators=[validate_email_unique, validate_email_no_russian])
     password = serializers.CharField(write_only=True, validators=[validate_password_length, validate_password_not_in_use])
+    role = serializers.ChoiceField(choices=User.ROLE_CHOICES, default='customer')
+
 
     def create(self, validated_data):
         temp_user = validated_data
@@ -99,10 +103,8 @@ class LoginSerializer(serializers.Serializer):
         user = User.objects.filter(email=email).first()
         if user is None:
             errors["email"] = ["Пользователь с таким email не найден"]
-
         elif not user.check_password(password):
             errors["password"] = ["Неверный пароль"]
-
         elif not user.is_active:
             errors["email"] = ["Аккаунт не подтверждён"]
 
@@ -111,5 +113,41 @@ class LoginSerializer(serializers.Serializer):
 
         # если всё хорошо, передаём пользователя дальше
         data["user"] = user
+        data["role"] = user.role
         return data
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ('id', 'name',)
+        read_only_fields = ('id',)
+
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ('id', 'name',)
+        read_only_fields = ('id',)
+
+class ProductParameterSerializer(serializers.ModelSerializer):
+    parameter = serializers.StringRelatedField()
+
+    class Meta:
+        model = ProductParameter
+        fields = ('parameter', 'value',)
+
+class ProductSerializer(serializers.ModelSerializer):
+    category = serializers.StringRelatedField()
+
+    class Meta:
+        model = Product
+        fields = ('name', 'category',)
+
+class ProductInfoSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_parameters = ProductParameterSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = ProductInfo
+        fields = ('id', 'model', 'product', 'shop', 'quantity', 'price', 'price_rrc', 'product_parameters',)
+        read_only_fields = ('id',)
 
