@@ -57,11 +57,11 @@
                                 li.classList.add("product-item");
                                 li.innerHTML = `
                                     <div class="product-header">
-                                        <h3 class="product-name">${product.name}</h3>
+                                        <h3 class="product-name">${product.product_name}</h3>
                                         <span class="product-price">${product.price} руб.</span>
                                     </div>
                                     <div class="product-details">
-                                        <p class="product-shop"><strong>Поставщик:</strong> ${product.shop || "Не указано"}</p>
+                                        <p class="product-shop"><strong>Поставщик:</strong> ${product.shop_name || "Не указано"}</p>
                                         <div class="product-specs">
                                             <strong>Характеристики:</strong>
                                             <ul>

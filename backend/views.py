@@ -7,7 +7,9 @@ from django.utils.encoding import force_str, force_bytes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
-from .serializers import RegisterSerializer, LoginSerializer
+
+from .filters import ProductInfoFilter
+from .serializers import RegisterSerializer, LoginSerializer, ProductInfoSerializer, CategorySerializer
 from backend.models import User, Category
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
@@ -189,23 +191,24 @@ class ShopProductView(APIView):
             return Response({"error": "Магазин не найден"}, status=status.HTTP_404_NOT_FOUND)
 
         products = ProductInfo.objects.filter(shop=shop).prefetch_related('parameters')
-        product_data = []
-
-        for product in products:
-            parameters = [
-                {"name": param.parameter.name, "value": param.value}
-                for param in product.parameters.all()
-            ]
-            shop_name = product.shop.name if product.shop else "Не указано"
-            product_data.append({
-                "id": product.id,
-                "name": product.product.name,
-                "price": product.price,
-                "quantity": product.quantity,
-                "parameters": parameters,  # передаём параметры как массив объектов
-                "shop": shop_name
-            })
-        return Response(product_data, status=status.HTTP_200_OK)
+        # product_data = []
+        #
+        # for product in products:
+        #     parameters = [
+        #         {"name": param.parameter.name, "value": param.value}
+        #         for param in product.parameters.all()
+        #     ]
+        #     shop_name = product.shop.name if product.shop else "Не указано"
+        #     product_data.append({
+        #         "id": product.id,
+        #         "name": product.product.name,
+        #         "price": product.price,
+        #         "quantity": product.quantity,
+        #         "parameters": parameters,  # передаём параметры как массив объектов
+        #         "shop": shop_name
+        #     })
+        product_data = ProductInfoSerializer(products, many=True)
+        return Response(product_data.data, status=status.HTTP_200_OK)
 
     # загрузка товаров из файла
     def post(self, request, *args, **kwargs):
@@ -273,3 +276,36 @@ class ShopProductView(APIView):
                 continue
 
         return Response({"status": "Товар успешно обновлён"}, status=status.HTTP_200_OK)
+
+@login_required(login_url="/login/")
+def customer_products_view(request):
+    products = ProductInfo.objects.select_related('product', 'shop').prefetch_related('parameters').all()
+    return render(request, "customer-products.html", {"products": products})
+
+class CategoryListView(APIView):
+    def get(self, request):
+        categories = Category.objects.all()
+        serializer = CategorySerializer(categories, many=True)
+        return Response(serializer.data, status=200)
+
+class CategoryParametersView(APIView):
+    def get(self, request, category_id):
+        try:
+            category = Category.objects.get(id=category_id)
+        except Category.DoesNotExist:
+            return Response({"error": "Категория не найдена"}, status=404)
+
+        # уникальные параметры для категории
+        parameters = Parameter.objects.filter(product_parameters__product_info__product__categories=category).distinct()
+        parameter_data = [{"id": param.id, "name": param.name} for param in parameters]
+
+        return Response(parameter_data, status=200)
+
+# получение всех товаров для покупателей
+class CustomerProductsView(APIView):
+    def get(self, request):
+        products = ProductInfo.objects.select_related('product', 'shop').prefetch_related('parameters').all()
+        filterset = ProductInfoFilter(request.query_params, queryset=products)
+        filtered_products = filterset.qs
+        serializer = ProductInfoSerializer(filtered_products, many=True)
+        return Response(serializer.data, status=200)

@@ -143,11 +143,24 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = ('name', 'category',)
 
 class ProductInfoSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-    product_parameters = ProductParameterSerializer(read_only=True, many=True)
+    # product = ProductSerializer(read_only=True)
+    # product_parameters = ProductParameterSerializer(read_only=True, many=True)
+    #
+    # class Meta:
+    #     model = ProductInfo
+    #     fields = ('id', 'model', 'product', 'shop', 'quantity', 'price', 'price_rrc', 'product_parameters',)
+    #     read_only_fields = ('id',)
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    shop_name = serializers.CharField(source='shop.name', read_only=True)
+    parameters = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductInfo
-        fields = ('id', 'model', 'product', 'shop', 'quantity', 'price', 'price_rrc', 'product_parameters',)
+        fields = ('id', 'product_name', 'price', 'quantity', 'parameters', 'shop_name', 'price_rrc')
         read_only_fields = ('id',)
+
+    def get_parameters(self, obj):
+        return [{"name": param.parameter.name, "value": param.value} for param in obj.parameters.all()] # получаем параметры в виде списка словарей
+
+
 

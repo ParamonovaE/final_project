@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Каталог товаров</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/customer.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Каталог товаров</h2>
+
+        <!-- форма для фильтрации -->
+        <div class="filters">
+            <div class="filter-group">
+                <input type="text" id="product-name" placeholder="Название товара">
+                <i class="fas fa-search"></i>
+            </div>
+            <div class="filter-group">
+                <input type="text" id="shop-name" placeholder="Поставщик">
+                <i class="fas fa-store"></i>
+            </div>
+            <div class="filter-group">
+                <input type="number" id="min-price" placeholder="Минимальная цена">
+                <input type="number" id="max-price" placeholder="Максимальная цена">
+                <i class="fas fa-dollar-sign"></i>
+            </div>
+            <div class="filter-group">
+                <select id="category-select">
+                    <option value="">Выберите каталог</option>
+                </select>
+                <i class="fas fa-list"></i>
+            </div>
+            <div id="category-filters" class="category-filters"></div>
+            <div class="filter-buttons">
+                <button id="apply-filters" class="btn-primary">Применить фильтры</button>
+                <button id="reset-filters" class="btn-secondary">Сбросить фильтры</button>
+            </div>
+        </div>
+
+        <div id="products-container">
+            <h3>Все товары</h3>
+            <ul id="product-list"></ul>
+        </div>
+
+        <button onclick="window.location.href='/main_depends/'" class="btn-back">Вернуться назад</button>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const productList = document.getElementById("product-list");
+            const applyFiltersBtn = document.getElementById("apply-filters");
+            const resetFiltersBtn = document.getElementById("reset-filters");
+            const categorySelect = document.getElementById("category-select");
+            const categoryFilters = document.getElementById("category-filters");
+
+            // загрузка категорий
+            function loadCategories() {
+                fetch("/api/categories/", {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    data.forEach(category => {
+                        const option = document.createElement("option");
+                        option.value = category.id;
+                        option.textContent = category.name;
+                        categorySelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error("Ошибка загрузки категорий", error));
+            }
+
+            // загружаем фильтры для выбранной категории
+            categorySelect.addEventListener("change", function () {
+                const categoryId = this.value;
+                if (!categoryId) {
+                    categoryFilters.innerHTML = "";
+                    return;
+                }
+
+                fetch(`/api/categories/${categoryId}/parameters/`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    categoryFilters.innerHTML = "";
+
+                    data.forEach(param => {
+                        const input = document.createElement("input");
+                        input.type = "text";
+                        input.id = `param-${param.id}`;
+                        input.placeholder = param.name;
+                        categoryFilters.appendChild(input);
+                    });
+                })
+                .catch(error => console.error("Ошибка загрузки параметров", error));
+            });
+
+            // загрузка товаров с учётом фильтров
+            function loadProducts(filters = {}) {
+                const queryParams = new URLSearchParams(filters).toString();
+                fetch(`/api/customer/products/?${queryParams}`, {
+                    method: "GET",
+                    headers: {
+                        "Content-Type": "application/json"
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    productList.innerHTML = "";
+
+                    if (data.length === 0) {
+                        productList.innerHTML = "<p>Товары не найдены</p>";
+                        return;
+                    }
+
+                    data.forEach(product => {
+                        const li = document.createElement("li");
+                        li.classList.add("product-item");
+                        li.innerHTML = `
+                            <div class="product-header">
+                                <h3 class="product-name">${product.product_name}</h3>
+                                <span class="product-price">${product.price} руб.</span>
+                            </div>
+                            <div class="product-details">
+                                <p class="product-shop"><strong>Поставщик:</strong> ${product.shop_name}</p>
+                                <div class="product-specs">
+                                    <strong>Характеристики:</strong>
+                                    <ul>
+                                        ${product.parameters.map(param => `
+                                            <li>${param.name}: ${param.value}</li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                                <p class="product-quantity"><strong>Количество:</strong> ${product.quantity}</p>
+                            </div>
+                        `;
+                        productList.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error("Ошибка загрузки товаров", error);
+                    productList.innerHTML = "<p>Ошибка загрузки товаров</p>";
+                });
+            }
+
+            applyFiltersBtn.addEventListener("click", function () {
+                const filters = {
+                    product_name: document.getElementById("product-name").value,
+                    shop_name: document.getElementById("shop-name").value,
+                    min_price: document.getElementById("min-price").value,
+                    max_price: document.getElementById("max-price").value,
+                    category: categorySelect.value,
+                };
+
+                // фильтры по характеристикам
+                const paramInputs = categoryFilters.querySelectorAll("input");
+                paramInputs.forEach(input => {
+                    if (input.value) {
+                        filters[input.id] = input.value;
+                    }
+                });
+
+                loadProducts(filters);
+            });
+
+            // сброс фильтров
+            resetFiltersBtn.addEventListener("click", function () {
+                document.getElementById("product-name").value = "";
+                document.getElementById("shop-name").value = "";
+                document.getElementById("min-price").value = "";
+                document.getElementById("max-price").value = "";
+                categorySelect.value = "";
+                categoryFilters.innerHTML = "";
+                loadProducts();
+            });
+
+            loadCategories();
+            loadProducts();
+        });
+    </script>
+</body>
+</html>
