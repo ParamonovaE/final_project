@@ -119,6 +119,24 @@ class ProductParameter(models.Model):
     def __str__(self):
         return f"{self.parameter.name}: {self.product_info.product.name} {self.value} "
 
+class Basket(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='basket')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Корзина {self.id} - {self.user.first_name} {self.user.last_name}"
+
+class BasketItem(models.Model):
+    basket = models.ForeignKey(Basket, on_delete=models.CASCADE, related_name='items')
+    product_info = models.ForeignKey(ProductInfo, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.quantity} x {self.product_info.product.name}"
+
+    def total_price(self):
+        return self.quantity * self.product_info.price
+
 class Order(models.Model):
     STATUS_CHOICES = [
         ('new', 'Новый'),

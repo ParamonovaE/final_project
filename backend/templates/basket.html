@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Корзина</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/basket.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h2>Корзина</h2>
+
+        {% if is_basket_empty %}
+            <p>Ваша корзина пуста.</p>
+        {% else %}
+            <div id="basket-items">
+                {% for item in basket_items %}
+                    <div class="basket-item" data-item-id="{{ item.id }}" data-available-quantity="{{ item.product_info.quantity }}">
+                        <h3>{{ item.product_info.product.name }}</h3>
+                        <p>Магазин: {{ item.product_info.shop.name }}</p>
+                        <p>Цена за единицу: {{ item.product_info.price }} руб.</p>
+                        <div class="quantity-controls">
+                            <button onclick="updateQuantity({{ item.id }}, -1)" class="btn-quantity">-</button>
+                            <span class="quantity">{{ item.quantity }}</span>
+                            <button onclick="updateQuantity({{ item.id }}, 1)" class="btn-quantity">+</button>
+                        </div>
+                        <p>Общая стоимость: {{ item.total_price }} руб.</p>
+                        <button onclick="removeFromBasket({{ item.id }})" class="btn-danger">Удалить</button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <button onclick="window.location.href='/customer-products/'" class="btn-back">Вернуться назад</button>
+    </div>
+
+    <script>
+        // функция для обновления количества товара
+        function updateQuantity(itemId, change) {
+            const quantityElement = document.querySelector(`.basket-item[data-item-id="${itemId}"] .quantity`);
+            const currentQuantity = parseInt(quantityElement.textContent);
+            const newQuantity = currentQuantity + change;
+
+            if (newQuantity < 1) {
+                alert("Количество не может быть меньше 1.");
+                return;
+            }
+
+            const availableQuantity = parseInt(
+                document.querySelector(`.basket-item[data-item-id="${itemId}"]`).dataset.availableQuantity
+            );
+
+            // проверяем, что количество не превышает доступное
+            if (newQuantity > availableQuantity) {
+                alert(`Доступно только ${availableQuantity} единиц товара.`);
+                return;
+            }
+
+            fetch(`/api/basket/items/${itemId}/`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${localStorage.getItem("token")}`,
+                },
+                body: JSON.stringify({
+                    quantity: newQuantity
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.Error || "Ошибка при обновлении количества.");
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.quantity) {
+                    quantityElement.textContent = data.quantity;
+                }
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+        }
+
+        // функция для удаления товара из корзины
+        function removeFromBasket(itemId) {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Пожалуйста, авторизуйтесь для удаления товаров из корзины.");
+                window.location.href = "/login/";
+                return;
+            }
+
+            fetch(`/api/basket/items/${itemId}/`, {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("Ошибка при удалении товара из корзины.");
+                }
+            })
+            .then(data => {
+                if (data.Status === true) {
+                    window.location.reload(); // перезагружаем страницу для обновления списка
+                } else {
+                    alert(data.Error || "Ошибка при удалении товара из корзины.");
+                }
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+        }
+    </script>
+</body>
+</html>

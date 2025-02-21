@@ -10,7 +10,7 @@ from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import check_password
 from rest_framework import serializers
-from .models import Product, ProductInfo, Parameter, ProductParameter, Shop
+from .models import Product, ProductInfo, ProductParameter, Shop, Basket, BasketItem, Order, OrderItem
 
 # функции валидации
 
@@ -162,5 +162,34 @@ class ProductInfoSerializer(serializers.ModelSerializer):
     def get_parameters(self, obj):
         return [{"name": param.parameter.name, "value": param.value} for param in obj.parameters.all()] # получаем параметры в виде списка словарей
 
+
+class BasketItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BasketItem
+        fields = ['id', 'product_info', 'quantity']
+
+    def validate(self, data):
+        quantity = data.get('quantity')
+        product_info = self.instance.product_info if self.instance else data.get('product_info')
+
+        if quantity and product_info:
+            available_quantity = product_info.quantity
+            # проверяем, что количество товара в корзине не превышает доступное максимальное количество для товара
+            if quantity > available_quantity:
+                raise serializers.ValidationError(
+                    f'Доступно только {available_quantity} единиц товара'
+                )
+            # проверяем, что количество не меньше 1
+            if quantity < 1:
+                raise serializers.ValidationError("Количество не может быть меньше 1.")
+
+        return data
+
+class BasketSerializer(serializers.ModelSerializer):
+    items = BasketItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Basket
+        fields = ['id', 'user', 'created_at', 'items']
 
 

@@ -2,15 +2,18 @@ import smtplib
 from django.contrib.auth import login
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.encoding import force_str, force_bytes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
 
+from . import serializers
 from .filters import ProductInfoFilter
-from .serializers import RegisterSerializer, LoginSerializer, ProductInfoSerializer, CategorySerializer
-from backend.models import User, Category
+from .serializers import RegisterSerializer, LoginSerializer, ProductInfoSerializer, CategorySerializer, \
+    BasketSerializer, BasketItemSerializer
+from backend.models import User, Category, Basket, BasketItem
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
@@ -309,3 +312,112 @@ class CustomerProductsView(APIView):
         filtered_products = filterset.qs
         serializer = ProductInfoSerializer(filtered_products, many=True)
         return Response(serializer.data, status=200)
+
+# для отображения корзины пользователя
+@login_required(login_url="/login/")
+def basket_view(request):
+    basket, created = Basket.objects.get_or_create(user=request.user)
+    basket_items = BasketItem.objects.filter(basket=basket).select_related(
+        "product_info__product", "product_info__shop"
+    )
+    is_basket_empty = not basket_items.exists()
+
+    context = {
+        "basket": basket,
+        "basket_items": basket_items,
+        "is_basket_empty": is_basket_empty,
+    }
+
+    return render(request, "basket.html", context)
+
+class BasketView(APIView):
+    # получить корзину пользователя
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется авторизация'}, status=403)
+
+        try:
+            basket = Basket.objects.get(user=request.user)
+            print(basket)
+        except Basket.DoesNotExist:
+            return Response({'Status': True, 'Message': 'Корзина пуста'}, status=status.HTTP_200_OK)
+
+        serializer = BasketSerializer(basket)
+        return Response(serializer.data)
+
+    # добавить товар в корзину
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется авторизация'}, status=403)
+
+        try:
+            data = request.data
+            product_info_id = data.get('product_info_id')
+            quantity = int(data.get('quantity', 1))
+        except (AttributeError, ValueError, KeyError) as e:
+            return JsonResponse({'Status': False, 'Error': 'Некорректные данные'}, status=400)
+
+        if not product_info_id:
+            return JsonResponse({'Status': False, 'Error': 'Не указан товар'}, status=400)
+
+        Basket.objects.filter(user=None).delete()
+
+        basket, created = Basket.objects.get_or_create(user_id=request.user.id)
+        print("Корзина пользователя:", basket)
+
+        if BasketItem.objects.filter(basket=basket, product_info_id=product_info_id).exists():
+            return JsonResponse({'Status': True, 'Message': 'Этот товар уже в корзине'}, status=200)
+
+        # проверяем, есть ли уже такой товар в корзине
+        try:
+            basket_item = BasketItem.objects.get_or_create(
+                basket=basket,
+                product_info_id=product_info_id,
+                quantity=quantity
+            )
+
+            print("Товар добавлен в корзину:", basket_item)  # выводим добавленный товар
+
+            serializer = BasketSerializer(basket)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return JsonResponse({'Status': False, 'Error': str(e)}, status=400)
+
+    # обновить количество товара в корзине
+    def patch(self, request, item_id, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется авторизация'}, status=403)
+
+        try:
+            basket_item = BasketItem.objects.get(id=item_id, basket__user=request.user)
+        except BasketItem.DoesNotExist:
+            return JsonResponse({'Status': False, 'Error': 'Товар не найден в корзине'}, status=404)
+
+        # обновляем данные
+        try:
+            data = request.data
+            serializer = BasketItemSerializer(basket_item, data=data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except serializers.ValidationError as e:
+            return JsonResponse({'Status': False, 'Error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'Status': False, 'Error': str(e)}, status=400)
+
+    # удалить товар из корзины
+    def delete(self, request, item_id, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'Status': False, 'Error': 'Требуется авторизация'}, status=403)
+
+        try:
+            basket_item = BasketItem.objects.get(id=item_id, basket__user=request.user)
+        except BasketItem.DoesNotExist:
+            return JsonResponse({'Status': False, 'Error': 'Товар не найден в корзине'}, status=404)
+
+        # удаляем товар из корзины
+        try:
+            basket_item.delete()
+            return JsonResponse({'Status': True, 'Message': 'Товар удален из корзины'}, status=200)
+        except Exception as e:
+            return JsonResponse({'Status': False, 'Error': str(e)}, status=400)

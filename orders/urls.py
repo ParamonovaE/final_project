@@ -16,9 +16,10 @@ Including another URLconf
 """
 from django.shortcuts import redirect
 from django.urls import path
+
 from backend.views import RegisterView, VerifyEmailView, LoginAccount, ResetPasswordView, ResetPasswordConfirmView, \
     main_depends_role, shop_products_view, ShopProductView, customer_products_view, CustomerProductsView, \
-    CategoryListView, CategoryParametersView
+    CategoryListView, CategoryParametersView, basket_view, BasketView
 
 urlpatterns = [
     path('', lambda request: redirect('login/')),
@@ -35,5 +36,9 @@ urlpatterns = [
     path('api/customer/products/', CustomerProductsView.as_view(), name='customer-products-api'),
     path("api/categories/", CategoryListView.as_view(), name="category-list"),
     path("api/categories/<int:category_id>/parameters/", CategoryParametersView.as_view(), name="category-parameters"),
+    path('api/basket/', BasketView.as_view(), name='basket-api'),
+    path('basket/', basket_view, name='basket-page'),
+    path('api/basket/items/<int:item_id>/', BasketView.as_view(), name='basket-item-update'),
+    path('api/basket/items/<int:item_id>/', BasketView.as_view(), name='basket-item-detail'),
 ]
 

@@ -12,7 +12,11 @@
     <div class="container">
         <h2>Каталог товаров</h2>
 
-        <!-- форма для фильтрации -->
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="/basket/" class="btn-primary">Корзина <span id="basket-counter">0</span></a>
+            <i class="fas fa-shopping-cart"></i>
+        </div>
+
         <div class="filters">
             <div class="filter-group">
                 <input type="text" id="product-name" placeholder="Название товара">
@@ -49,7 +53,71 @@
     </div>
 
     <script>
+        function addToBasket(productId) {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Пожалуйста, авторизуйтесь для добавления товаров в корзину.");
+                window.location.href = "/login/";
+                return;
+            }
+
+            const data = {
+                product_info_id: productId,
+                quantity: 1
+            };
+
+            fetch("/api/basket/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("Ошибка при добавлении товара в корзину.");
+                }
+            })
+            .then(data => {
+                if (data.Status === true && data.Message === "Этот товар уже в корзине") {
+                    alert("Этот товар уже в корзине.");
+                } else {
+                    alert("Товар добавлен в корзину!");
+                    updateBasketCounter(); // обновляем счетчик корзины
+                }
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+        }
+
+        // функция для обновления счетчика корзины
+        function updateBasketCounter() {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            fetch("/api/basket/", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const basketCounter = document.getElementById("basket-counter");
+                if (basketCounter) {
+                    basketCounter.textContent = data.items.length; // обновляем счетчик
+                }
+            })
+            .catch(error => console.error("Ошибка при обновлении счетчика корзины:", error));
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
+            updateBasketCounter(); // загружаем счетчик корзины
             const productList = document.getElementById("product-list");
             const applyFiltersBtn = document.getElementById("apply-filters");
             const resetFiltersBtn = document.getElementById("reset-filters");
@@ -76,7 +144,7 @@
                 .catch(error => console.error("Ошибка загрузки категорий", error));
             }
 
-            // загружаем фильтры для выбранной категории
+            // загрузка фильтров для выбранной категории
             categorySelect.addEventListener("change", function () {
                 const categoryId = this.value;
                 if (!categoryId) {
@@ -142,6 +210,7 @@
                                     </ul>
                                 </div>
                                 <p class="product-quantity"><strong>Количество:</strong> ${product.quantity}</p>
+                                <button onclick="addToBasket(${product.id})" class="btn-primary">Добавить в корзину</button>
                             </div>
                         `;
                         productList.appendChild(li);
@@ -153,6 +222,7 @@
                 });
             }
 
+            // применение фильтров
             applyFiltersBtn.addEventListener("click", function () {
                 const filters = {
                     product_name: document.getElementById("product-name").value,
