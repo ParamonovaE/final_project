@@ -14,28 +14,124 @@
         {% if is_basket_empty %}
             <p>Ваша корзина пуста.</p>
         {% else %}
-            <div id="basket-items">
-                {% for item in basket_items %}
-                    <div class="basket-item" data-item-id="{{ item.id }}" data-available-quantity="{{ item.product_info.quantity }}">
-                        <h3>{{ item.product_info.product.name }}</h3>
-                        <p>Магазин: {{ item.product_info.shop.name }}</p>
-                        <p>Цена за единицу: {{ item.product_info.price }} руб.</p>
-                        <div class="quantity-controls">
-                            <button onclick="updateQuantity({{ item.id }}, -1)" class="btn-quantity">-</button>
-                            <span class="quantity">{{ item.quantity }}</span>
-                            <button onclick="updateQuantity({{ item.id }}, 1)" class="btn-quantity">+</button>
+            <form id="basket-form">
+                <div id="basket-items">
+                    {% for item in basket_items %}
+                        <div class="basket-item" data-item-id="{{ item.id }}" data-available-quantity="{{ item.product_info.quantity }}" data-price="{{ item.product_info.price }}">
+                            <label>
+                                <input type="checkbox" name="selected_items" value="{{ item.id }}" {% if item.selected %}checked{% endif %}>
+                                <h3>{{ item.product_info.product.name }}</h3>
+                            </label>
+                            <p>Магазин: {{ item.product_info.shop.name }}</p>
+                            <p>Цена за единицу: {{ item.product_info.price }} руб.</p>
+                            <div class="quantity-controls">
+                                <button type="button" onclick="updateQuantity({{ item.id }}, -1)" class="btn-quantity">-</button>
+                                <span class="quantity">{{ item.quantity }}</span>
+                                <button type="button" onclick="updateQuantity({{ item.id }}, 1)" class="btn-quantity">+</button>
+                            </div>
+                            <p>Общая стоимость: <span class="total-price">{{ item.total_price }}</span> руб.</p>
+                            <button type="button" onclick="removeFromBasket({{ item.id }})" class="btn-danger">Удалить</button>
                         </div>
-                        <p>Общая стоимость: {{ item.total_price }} руб.</p>
-                        <button onclick="removeFromBasket({{ item.id }})" class="btn-danger">Удалить</button>
+                    {% endfor %}
+                </div>
+
+                <div id="delivery-address">
+                    <h3>Адрес доставки</h3>
+                    <label>Выберите адрес:</label>
+                    <div class="address-select-container">
+                        <select id="contact-select">
+                            <option value="">Новый адрес</option>
+                            {% for contact in contacts %}
+                                <option value="{{ contact.id }}">{{ contact.city }}, {{ contact.street }}, {{ contact.house }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="delete-address-btn" class="delete-address-btn" style="display: none;">×</button>
                     </div>
-                {% endfor %}
-            </div>
+
+                    <div id="new-address-fields">
+                        <label for="city">Город:</label>
+                        <input type="text" id="city" name="city">
+                        <label for="street">Улица:</label>
+                        <input type="text" id="street" name="street">
+                        <label for="house">Дом:</label>
+                        <input type="text" id="house" name="house">
+                        <label for="apartment">Квартира:</label>
+                        <input type="text" id="apartment" name="apartment">
+                        <label for="phone">Телефон:</label>
+                        <input type="text" id="phone" name="phone">
+                    </div>
+                </div>
+
+                <button type="button" id="create-order-btn" class="btn-primary" disabled>Оформить заказ</button>
+            </form>
         {% endif %}
 
         <button onclick="window.location.href='/customer-products/'" class="btn-back">Вернуться назад</button>
     </div>
 
     <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const contactSelect = document.getElementById("contact-select");
+            const deleteAddressBtn = document.getElementById("delete-address-btn");
+            const newAddressFields = document.getElementById("new-address-fields");
+            const createOrderBtn = document.getElementById("create-order-btn");
+
+            // функция для проверки, заполнен ли адрес
+            function checkAddress() {
+                const isContactSelected = contactSelect.value !== "";
+                const isNewAddressFilled =
+                    document.getElementById("city").value.trim() !== "" &&
+                    document.getElementById("street").value.trim() !== "" &&
+                    document.getElementById("house").value.trim() !== "" &&
+                    document.getElementById("phone").value.trim() !== "";
+
+                // активируем кнопку, если выбран адрес или заполнены поля нового адреса
+                createOrderBtn.disabled = !(isContactSelected || isNewAddressFilled);
+            }
+
+            contactSelect.addEventListener("change", function () {
+                if (contactSelect.value) {
+                    deleteAddressBtn.style.display = "inline-block";
+                    newAddressFields.style.display = "none";
+                } else {
+                    deleteAddressBtn.style.display = "none";
+                    newAddressFields.style.display = "block";
+                }
+                checkAddress();
+            });
+
+            const newAddressInputs = document.querySelectorAll("#new-address-fields input");
+            newAddressInputs.forEach(input => {
+                input.addEventListener("input", checkAddress);
+            });
+
+            // обработчик клика на крестик для удаления адреса
+            deleteAddressBtn.addEventListener("click", function () {
+                const contactId = contactSelect.value;
+                if (confirm("Вы уверены, что хотите удалить этот адрес?")) {
+                    fetch(`/api/contacts/${contactId}/`, {
+                        method: "DELETE",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Token ${localStorage.getItem("token")}`
+                        }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            throw new Error("Ошибка при удалении адреса.");
+                        }
+                    })
+                    .catch(error => {
+                        alert(error.message);
+                    });
+                }
+            });
+
+            checkAddress();
+        });
+
         // функция для обновления количества товара
         function updateQuantity(itemId, change) {
             const quantityElement = document.querySelector(`.basket-item[data-item-id="${itemId}"] .quantity`);
@@ -61,7 +157,7 @@
                 method: "PATCH",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Token ${localStorage.getItem("token")}`,
+                    "Authorization": `Token ${localStorage.getItem("token")}`
                 },
                 body: JSON.stringify({
                     quantity: newQuantity
@@ -78,6 +174,12 @@
             .then(data => {
                 if (data.quantity) {
                     quantityElement.textContent = data.quantity;
+
+                    const totalPriceElement = document.querySelector(`.basket-item[data-item-id="${itemId}"] .total-price`);
+                    if (totalPriceElement) {
+                        const pricePerUnit = parseFloat(document.querySelector(`.basket-item[data-item-id="${itemId}"]`).dataset.price);
+                        totalPriceElement.textContent = `${(data.quantity * pricePerUnit).toFixed(2)}`;
+                    }
                 }
             })
             .catch(error => {
@@ -110,15 +212,79 @@
             })
             .then(data => {
                 if (data.Status === true) {
-                    window.location.reload(); // перезагружаем страницу для обновления списка
+                    window.location.reload();
                 } else {
-                    alert(data.Error || "Ошибка при удалении товара из корзины.");
+                    alert(data.Error || "Ошибка при удаления товара из корзины.");
                 }
             })
             .catch(error => {
                 alert(error.message);
             });
         }
+
+        // функция для оформления заказа
+        function createOrder() {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Пожалуйста, авторизуйтесь для оформления заказа.");
+                window.location.href = "/login/";
+                return;
+            }
+
+            const selectedItems = Array.from(document.querySelectorAll('input[name="selected_items"]:checked'))
+                .map(input => input.value);
+
+            if (selectedItems.length === 0) {
+                alert("Выберите хотя бы один товар для заказа.");
+                return;
+            }
+
+            const contactSelect = document.getElementById("contact-select");
+            const contactId = contactSelect.value;
+
+            const orderData = {
+                selected_items: selectedItems,
+            };
+
+            if (contactId) {
+                orderData.contact_id = contactId;
+            } else {
+                orderData.city = document.getElementById("city").value;
+                orderData.street = document.getElementById("street").value;
+                orderData.house = document.getElementById("house").value;
+                orderData.apartment = document.getElementById("apartment").value;
+                orderData.phone = document.getElementById("phone").value;
+            }
+
+            fetch("/api/orders/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`
+                },
+                body: JSON.stringify(orderData)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("Ошибка при оформлении заказа.");
+                }
+            })
+            .then(data => {
+                if (data.Status === true) {
+                    alert("Заказ успешно оформлен!");
+                    window.location.href = "/orders/";
+                } else {
+                    alert(data.Error || "Ошибка при оформлении заказа.");
+                }
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+        }
+
+        document.getElementById("create-order-btn").addEventListener("click", createOrder);
     </script>
 </body>
 </html>

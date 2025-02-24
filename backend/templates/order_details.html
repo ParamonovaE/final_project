@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Детали заказа №{{ order.id }}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/order.css' %}">
+    {% load custom_filters %}
+</head>
+<body>
+    <div class="container">
+        <h2>Детали заказа №{{ order.id }}</h2>
+
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="{% url 'order' %}" class="btn-primary">Назад к заказам</a>
+        </div>
+
+        <div class="order-details">
+            <p><strong>Дата:</strong> {{ order.dt|date:"d.m.Y H:i" }}</p>
+            <p><strong>Статус:</strong> {{ order.get_status_display }}</p>
+            <p><strong>Общая стоимость:</strong> {{ total_price|floatformat:2 }} руб.</p>
+
+            <h3>Товары в заказе:</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Товар</th>
+                        <th>Поставщик</th>
+                        <th>Количество</th>
+                        <th>Цена за единицу</th>
+                        <th>Общая стоимость</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td>{{ item.product_info.product.name }}</td>
+                            <td>{{ item.product_info.shop.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.product_info.price|floatformat:2 }} руб.</td>
+                            <td>{{ item.quantity|mul:item.product_info.price|floatformat:2 }} руб.</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">Товары не найдены.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,11 +1,10 @@
-from rest_framework import serializers
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from backend.models import User, Category
+from backend.models import User, Category, Contact
 from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import check_password
@@ -191,5 +190,72 @@ class BasketSerializer(serializers.ModelSerializer):
     class Meta:
         model = Basket
         fields = ['id', 'user', 'created_at', 'items']
+
+class ContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = ['id', 'city', 'street', 'house', 'apartment', 'phone']
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = ['product_info', 'quantity']
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = OrderItemSerializer(many=True)
+
+    class Meta:
+        model = Order
+        fields = ['id', 'user', 'status', 'items']
+
+class CreateOrderSerializer(serializers.Serializer):
+    selected_items = serializers.ListField(child=serializers.IntegerField())
+    contact_id = serializers.IntegerField(required=False)
+    city = serializers.CharField(max_length=50, required=False)
+    street = serializers.CharField(max_length=100, required=False)
+    house = serializers.CharField(max_length=15, required=False)
+    apartment = serializers.CharField(max_length=15, required=False)
+    phone = serializers.CharField(max_length=20, required=False)
+
+    def validate(self, data):
+        # проверяем, что передан либо contact_id, либо все поля для нового адреса
+        if not data.get('contact_id') and not all(
+            [data.get('city'), data.get('street'), data.get('house'), data.get('phone')]
+        ):
+            raise serializers.ValidationError("Необходимо указать либо ID существующего контакта, либо все данные для нового адреса.")
+        return data
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        selected_items = validated_data.pop('selected_items')
+        contact_id = validated_data.pop('contact_id', None)
+
+        # если передан contact_id, используем существующий контакт
+        if contact_id:
+            try:
+                contact = Contact.objects.get(id=contact_id, user=user)
+            except Contact.DoesNotExist:
+                raise serializers.ValidationError("Контакт не найден.")
+        else:
+            # иначе создаем новый контакт
+            contact = Contact.objects.create(user=user, **validated_data)
+
+        order = Order.objects.create(user=user, status='new', contact=contact)
+
+        for item_id in selected_items:
+            try:
+                basket_item = BasketItem.objects.get(id=item_id, basket__user=user)
+                OrderItem.objects.create(
+                    order=order,
+                    product_info=basket_item.product_info,
+                    quantity=basket_item.quantity
+                )
+                basket_item.delete()
+            except BasketItem.DoesNotExist:
+                raise serializers.ValidationError(f"Товар с ID {item_id} не найден в корзине.")
+
+        return order
+
+
 
 

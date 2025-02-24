@@ -19,7 +19,8 @@ from django.urls import path
 
 from backend.views import RegisterView, VerifyEmailView, LoginAccount, ResetPasswordView, ResetPasswordConfirmView, \
     main_depends_role, shop_products_view, ShopProductView, customer_products_view, CustomerProductsView, \
-    CategoryListView, CategoryParametersView, basket_view, BasketView
+    CategoryListView, CategoryParametersView, basket_view, BasketView, OrderView, order_history_view, \
+    order_detail_view, ContactView
 
 urlpatterns = [
     path('', lambda request: redirect('login/')),
@@ -40,5 +41,12 @@ urlpatterns = [
     path('basket/', basket_view, name='basket-page'),
     path('api/basket/items/<int:item_id>/', BasketView.as_view(), name='basket-item-update'),
     path('api/basket/items/<int:item_id>/', BasketView.as_view(), name='basket-item-detail'),
+    path('api/contacts/', ContactView.as_view(), name='contacts'),
+    path('api/contacts/<int:contact_id>/', ContactView.as_view(), name='delete-contact'),
+    path('api/orders/', OrderView.as_view(), name='create-order'),
+    path('orders/', order_history_view, name='order-history'),
+    #path('orders/', OrderHistoryView.as_view(), name='order'),
+    path('orders/', OrderView.as_view(), name='order'),
+    path('orders/<int:order_id>/', order_detail_view, name='order-details'),
 ]
 

@@ -3,17 +3,17 @@ from django.contrib.auth import login
 from django.contrib.auth.hashers import make_password
 from django.core.mail import send_mail
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.utils.encoding import force_str, force_bytes
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
-
+from orders.settings import DEFAULT_FROM_EMAIL
 from . import serializers
 from .filters import ProductInfoFilter
 from .serializers import RegisterSerializer, LoginSerializer, ProductInfoSerializer, CategorySerializer, \
-    BasketSerializer, BasketItemSerializer
-from backend.models import User, Category, Basket, BasketItem
+    BasketSerializer, BasketItemSerializer, CreateOrderSerializer, OrderSerializer, ContactSerializer
+from backend.models import User, Category, Basket, BasketItem, Order, OrderItem, Contact
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
@@ -321,11 +321,13 @@ def basket_view(request):
         "product_info__product", "product_info__shop"
     )
     is_basket_empty = not basket_items.exists()
+    contacts = Contact.objects.filter(user=request.user)
 
     context = {
         "basket": basket,
         "basket_items": basket_items,
         "is_basket_empty": is_basket_empty,
+        'contacts': contacts,
     }
 
     return render(request, "basket.html", context)
@@ -421,3 +423,123 @@ class BasketView(APIView):
             return JsonResponse({'Status': True, 'Message': 'Товар удален из корзины'}, status=200)
         except Exception as e:
             return JsonResponse({'Status': False, 'Error': str(e)}, status=400)
+class ContactView(APIView):
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'Status': False, 'Error': 'Требуется авторизация'}, status=status.HTTP_403_FORBIDDEN)
+
+        contacts = Contact.objects.filter(user=request.user)
+        serializer = ContactSerializer(contacts, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'Status': False, 'Error': 'Требуется авторизация'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = ContactSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response({'Status': True, 'Message': 'Контакт успешно добавлен'}, status=status.HTTP_201_CREATED)
+        return Response({'Status': False, 'Error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, contact_id, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'Status': False, 'Error': 'Требуется авторизация'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            contact = Contact.objects.get(id=contact_id, user=request.user)
+        except Contact.DoesNotExist:
+            return Response({'Status': False, 'Error': 'Контакт не найден'}, status=404)
+
+        contact.delete()
+        return Response({'Status': True, 'Message': 'Контакт удален'}, status=200)
+
+class OrderView(APIView):
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({'Status': False, 'Error': 'Требуется авторизация'}, status=status.HTTP_403_FORBIDDEN)
+
+        orders = Order.objects.filter(user=request.user).order_by('dt')
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data)
+
+    # создать заказ из выбранных товаров с адресом доставки
+    def post(self, request, *args, **kwargs):
+        print("Данные запроса:", request.data)
+        if not request.user.is_authenticated:
+            return Response({'Status': False, 'Error': 'Требуется авторизация'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = CreateOrderSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            order = serializer.save()
+            print(f"Заказ {order.id} создан. Отправка email на {request.user.email}.")
+            self.send_confirmation_email(request.user.email, order.id)
+            self.send_invoice_email(order)
+            return Response({'Status': True, 'Message': 'Заказ успешно оформлен', 'OrderId': order.id}, status=status.HTTP_201_CREATED)
+        print("Ошибки валидации:", serializer.errors)
+        return Response({'Status': False, 'Error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    def send_confirmation_email(self, email, order_id):
+        subject = 'Подтверждение заказа'
+        message = f'Ваш заказ №{order_id} успешно оформлен. Спасибо за покупку!'
+        from_email = DEFAULT_FROM_EMAIL
+        recipient_list = [email]
+
+        send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+
+    # отправляет email каждому поставщику с его товарами в заказе
+    def send_invoice_email(self, order):
+        # группируем товары по поставщикам
+        shops = {}
+        for item in order.items.all():
+            shop = item.product_info.shop
+            if shop not in shops:
+                shops[shop] = []
+            shops[shop].append(item)
+
+        # отправка email каждому поставщику
+        for shop, items in shops.items():
+            if not shop.user.email:
+                continue
+
+            subject = f"Новый заказ №{order.id}"
+            message = f"Здравствуйте, {shop.name}!\n\nВам поступил новый заказ. Детали:\n\n"
+
+            total_order_price = 0
+
+            for item in items:
+                total_price = item.quantity * item.product_info.price
+                total_order_price += total_price
+                message += f"- {item.product_info.product.name} (x{item.quantity}): {item.product_info.price} руб. за шт. Всего: {total_price} руб.\n"
+
+            message += f"\nОбщая сумма заказа: {total_order_price} руб.\n"
+            message += f"\nАдрес доставки: {order.contact.city}, {order.contact.street}, {order.contact.house}\n"
+            message += f"Телефон клиента: {order.contact.phone}\n\n"
+
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [shop.user.email],
+                fail_silently=False,
+            )
+
+@login_required(login_url="/login/")
+def order_history_view(request):
+    orders = Order.objects.filter(user=request.user).order_by('dt')
+    return render(request, 'order.html', {'orders': orders})
+
+@login_required(login_url="/login/")
+def order_detail_view(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    items = OrderItem.objects.filter(order=order).select_related('product_info__shop')  # товары с информацией о поставщике
+
+    # Вычисляем общую сумму заказа
+    total_price = sum(item.quantity * item.product_info.price for item in items)
+
+    context = {
+        'order': order,
+        'items': items,
+        'total_price': total_price,
+    }
+    return render(request, 'order_details.html', context)
