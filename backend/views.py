@@ -12,7 +12,8 @@ from orders.settings import DEFAULT_FROM_EMAIL
 from . import serializers
 from .filters import ProductInfoFilter
 from .serializers import RegisterSerializer, LoginSerializer, ProductInfoSerializer, CategorySerializer, \
-    BasketSerializer, BasketItemSerializer, CreateOrderSerializer, OrderSerializer, ContactSerializer
+    BasketSerializer, BasketItemSerializer, CreateOrderSerializer, OrderSerializer, ContactSerializer, \
+    OrderItemSerializer
 from backend.models import User, Category, Basket, BasketItem, Order, OrderItem, Contact
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import default_token_generator
@@ -179,7 +180,12 @@ class ResetPasswordConfirmView(APIView):
 
 @login_required(login_url="/login/")
 def shop_products_view(request):
-    return render(request, "shop-products.html", {"user": request.user})
+    try:
+        shop = Shop.objects.get(user=request.user)
+    except Shop.DoesNotExist:
+        return render(request, 'shop_products.html', {'error': 'Вы не являетесь поставщиком'})
+
+    return render(request, "shop-products.html", {'shop': shop, "user": request.user})
 
 # импорт, получение и обновление товаров магазина
 class ShopProductView(APIView):
@@ -307,7 +313,7 @@ class CategoryParametersView(APIView):
 # получение всех товаров для покупателей
 class CustomerProductsView(APIView):
     def get(self, request):
-        products = ProductInfo.objects.select_related('product', 'shop').prefetch_related('parameters').all()
+        products = ProductInfo.objects.select_related('product', 'shop').prefetch_related('parameters').filter(shop__is_active=True)
         filterset = ProductInfoFilter(request.query_params, queryset=products)
         filtered_products = filterset.qs
         serializer = ProductInfoSerializer(filtered_products, many=True)
@@ -322,6 +328,9 @@ def basket_view(request):
     )
     is_basket_empty = not basket_items.exists()
     contacts = Contact.objects.filter(user=request.user)
+
+    for item in basket_items:
+        item.is_shop_active_orders = item.product_info.shop.is_active
 
     context = {
         "basket": basket,
@@ -543,3 +552,128 @@ def order_detail_view(request, order_id):
         'total_price': total_price,
     }
     return render(request, 'order_details.html', context)
+
+@login_required(login_url="/login/")
+def shop_order_history_view(request):
+    try:
+        shop = Shop.objects.get(user=request.user)  # получаем магазин текущего пользователя
+    except Shop.DoesNotExist:
+        return render(request, 'shop_orders.html', {'error': 'Вы не являетесь поставщиком'})
+    status_filter = request.GET.get('status')
+
+    # получаем заказы, содержащие товары из прайса поставщика
+    orders = Order.objects.filter(items__product_info__shop=shop).distinct().order_by('dt')
+    if status_filter:
+        orders = orders.filter(status=status_filter)
+    orders_total_price = []
+    for order in orders:
+        total_price = 0
+        for item in order.items.filter(product_info__shop=shop):
+            total_price += item.quantity * item.product_info.price
+        orders_total_price.append({
+            'order': order,
+            'total_price': total_price,
+        })
+
+    return render(request, 'shop_orders.html', {'orders': orders_total_price, 'Order': Order})
+
+@login_required(login_url="/login/")
+def shop_order_detail_view(request, order_id):
+    try:
+        shop = Shop.objects.get(user=request.user)  # получаем магазин текущего пользователя
+    except Shop.DoesNotExist:
+        return render(request, 'shop_order_details.html', {'error': 'Вы не являетесь поставщиком'})
+
+    # получаем заказ, который содержит товары из прайса поставщика
+    orders = Order.objects.filter(id=order_id, items__product_info__shop=shop).distinct()
+    if not orders.exists():
+        return render(request, 'shop_order_details.html', {'error': 'Заказ не найден или не содержит ваших товаров'})
+
+    order = orders.first()
+
+    # фильтруем товары, которые принадлежат текущему поставщику
+    items = OrderItem.objects.filter(order=order, product_info__shop=shop).select_related('product_info__shop')
+
+    total_price = sum(item.quantity * item.product_info.price for item in items)
+
+    address = (
+        f"{order.contact.city}, {order.contact.street}, {order.contact.house}, кв. {order.contact.apartment}"
+        if order.contact
+        else "Адрес не указан"
+    )
+
+    context = {
+        'order': order,
+        'items': items,
+        'total_price': total_price,
+        'address': address,
+    }
+    return render(request, 'shop_order_details.html', context)
+
+class ShopOrdersView(APIView):
+    def get(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({"error": "Требуется авторизация"}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            shop = Shop.objects.get(user=request.user)
+        except Shop.DoesNotExist:
+            return Response({"error": "Вы не являетесь поставщиком"}, status=status.HTTP_403_FORBIDDEN)
+
+        status_filter = request.query_params.get('status')
+
+        # получаем заказы, содержащие товары из прайса поставщика
+        orders = Order.objects.filter(items__product_info__shop=shop).distinct()
+        if status_filter:
+            orders = orders.filter(status=status_filter)
+        serializer = OrderSerializer(orders, many=True)
+        return Response(serializer.data)
+
+    def patch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return Response({"error": "Требуется авторизация"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            shop = Shop.objects.get(user=request.user)
+        except Shop.DoesNotExist:
+            return Response({"error": "Вы не являетесь поставщиком"}, status=status.HTTP_403_FORBIDDEN)
+
+        # получаем ID заказа и новый статус из запроса
+        order_id = request.data.get('order_id')
+        new_status = request.data.get('status')
+
+        if not order_id or not new_status:
+            return Response({"error": "Необходимо указать order_id и status"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # получаем заказ, который содержит товары из прайса поставщика
+        try:
+            orders = Order.objects.filter(id=order_id, items__product_info__shop=shop).distinct()
+            if orders.exists():
+                order = orders.first()
+        except Order.DoesNotExist:
+            return Response({"error": "Заказ не найден или не содержит ваших товаров"},
+                            status=status.HTTP_404_NOT_FOUND)
+
+        if new_status not in dict(Order.STATUS_CHOICES).keys():
+            return Response({"error": "Недопустимый статус"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # обновляем статус заказа
+        order.status = new_status
+        order.save()
+
+        return Response({"status": "Статус заказа успешно обновлен", "order_id": order.id, "new_status": new_status})
+
+class ShopStatusView(APIView):
+    def get(self, request):
+        try:
+            shop = Shop.objects.get(user=request.user)
+            return Response({"is_active": shop.is_active})
+        except Shop.DoesNotExist:
+            return Response({"error": "Магазин не найден"}, status=404)
+    def post(self, request, *args, **kwargs):
+        try:
+            shop = Shop.objects.get(user=request.user)
+            shop.is_active = not shop.is_active  # переключаем статус
+            shop.save()
+            return Response({'status': 'success', 'is_active': shop.is_active})
+        except Shop.DoesNotExist:
+            return Response({'status': 'error', 'message': 'Вы не являетесь поставщиком'}, status=status.HTTP_404_NOT_FOUND)

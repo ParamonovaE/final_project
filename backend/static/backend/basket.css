@@ -192,3 +192,14 @@ h2, h3 {
     outline: none;
     box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
 }
+
+.disabled-item {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.disabled-item .unavailable-text {
+    color: red;
+    font-weight: bold;
+    margin-top: 10px;
+}

@@ -20,7 +20,8 @@ from django.urls import path
 from backend.views import RegisterView, VerifyEmailView, LoginAccount, ResetPasswordView, ResetPasswordConfirmView, \
     main_depends_role, shop_products_view, ShopProductView, customer_products_view, CustomerProductsView, \
     CategoryListView, CategoryParametersView, basket_view, BasketView, OrderView, order_history_view, \
-    order_detail_view, ContactView
+    order_detail_view, ContactView, ShopOrdersView, shop_order_history_view, shop_order_detail_view, \
+    ShopStatusView
 
 urlpatterns = [
     path('', lambda request: redirect('login/')),
@@ -45,8 +46,13 @@ urlpatterns = [
     path('api/contacts/<int:contact_id>/', ContactView.as_view(), name='delete-contact'),
     path('api/orders/', OrderView.as_view(), name='create-order'),
     path('orders/', order_history_view, name='order-history'),
-    #path('orders/', OrderHistoryView.as_view(), name='order'),
     path('orders/', OrderView.as_view(), name='order'),
     path('orders/<int:order_id>/', order_detail_view, name='order-details'),
+    path('shop_orders/', shop_order_history_view, name='shop-orders'),
+    path('shop_orders/', ShopOrdersView.as_view(), name='api-shop-orders'),
+    path('shop_orders/<int:order_id>/', shop_order_detail_view, name='shop-order-details'),
+    path('api/shop/orders/', ShopOrdersView.as_view(), name='shop-orders-api'),
+    # path('api/shop/toggle-active-orders/', ToggleAcceptingOrdersView.as_view(), name='toggle-active-orders-api'),
+    path('api/shop/status/', ShopStatusView.as_view(), name='shop-status'),
 ]
 

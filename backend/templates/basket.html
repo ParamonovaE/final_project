@@ -17,20 +17,39 @@
             <form id="basket-form">
                 <div id="basket-items">
                     {% for item in basket_items %}
-                        <div class="basket-item" data-item-id="{{ item.id }}" data-available-quantity="{{ item.product_info.quantity }}" data-price="{{ item.product_info.price }}">
+                        <div class="basket-item {% if not item.is_shop_active_orders %}disabled-item{% endif %}"
+                             data-item-id="{{ item.id }}"
+                             data-available-quantity="{{ item.product_info.quantity }}"
+                             data-price="{{ item.product_info.price }}">
                             <label>
-                                <input type="checkbox" name="selected_items" value="{{ item.id }}" {% if item.selected %}checked{% endif %}>
+                                <input type="checkbox"
+                                       name="selected_items"
+                                       value="{{ item.id }}"
+                                       {% if item.selected %}checked{% endif %}
+                                       {% if not item.is_shop_active_orders %}disabled{% endif %}>
                                 <h3>{{ item.product_info.product.name }}</h3>
                             </label>
                             <p>Магазин: {{ item.product_info.shop.name }}</p>
                             <p>Цена за единицу: {{ item.product_info.price }} руб.</p>
                             <div class="quantity-controls">
-                                <button type="button" onclick="updateQuantity({{ item.id }}, -1)" class="btn-quantity">-</button>
+                                <button type="button"
+                                        onclick="updateQuantity({{ item.id }}, -1)"
+                                        class="btn-quantity"
+                                        {% if not item.is_shop_active_orders %}disabled{% endif %}>-</button>
                                 <span class="quantity">{{ item.quantity }}</span>
-                                <button type="button" onclick="updateQuantity({{ item.id }}, 1)" class="btn-quantity">+</button>
+                                <button type="button"
+                                        onclick="updateQuantity({{ item.id }}, 1)"
+                                        class="btn-quantity"
+                                        {% if not item.is_shop_active_orders %}disabled{% endif %}>+</button>
                             </div>
                             <p>Общая стоимость: <span class="total-price">{{ item.total_price }}</span> руб.</p>
-                            <button type="button" onclick="removeFromBasket({{ item.id }})" class="btn-danger">Удалить</button>
+                            <button type="button"
+                                    onclick="removeFromBasket({{ item.id }})"
+                                    class="btn-danger"
+                                    {% if not item.is_shop_active_orders %}disabled{% endif %}>Удалить</button>
+                            {% if not item.is_shop_active_orders %}
+                                <p class="unavailable-text">Товар временно недоступен для заказа</p>
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>
@@ -42,7 +61,7 @@
                         <select id="contact-select">
                             <option value="">Новый адрес</option>
                             {% for contact in contacts %}
-                                <option value="{{ contact.id }}">{{ contact.city }}, {{ contact.street }}, {{ contact.house }}</option>
+                                <option value="{{ contact.id }}">{{ contact.city }}, {{ contact.street }}, {{ contact.house }}, кв. {{ contact.apartment }}</option>
                             {% endfor %}
                         </select>
                         <button id="delete-address-btn" class="delete-address-btn" style="display: none;">×</button>
@@ -231,8 +250,7 @@
                 return;
             }
 
-            const selectedItems = Array.from(document.querySelectorAll('input[name="selected_items"]:checked'))
-                .map(input => input.value);
+            const selectedItems = Array.from(document.querySelectorAll('input[name="selected_items"]:checked:not(:disabled)')).map(input => input.value);
 
             if (selectedItems.length === 0) {
                 alert("Выберите хотя бы один товар для заказа.");

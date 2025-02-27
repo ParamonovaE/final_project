@@ -86,3 +86,114 @@ td a:hover {
 .btn-details:hover {
     background-color: #218838;
 }
+
+.filter-form {
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-form label {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+}
+
+.filter-form select {
+    padding: 8px 12px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.filter-form select:hover {
+    border-color: #888;
+}
+
+.filter-form select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.filter-form button {
+    padding: 8px 16px;
+    font-size: 14px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.filter-form button:hover {
+    background-color: #0056b3;
+}
+
+.filter-form button:active {
+    background-color: #004080;
+}
+
+.status-select {
+    padding: 6px 10px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #fff;
+    cursor: pointer;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.status-select:hover {
+    border-color: #888;
+}
+
+.status-select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 70%;
+}
+
+.select-wrapper i {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #666;
+    font-size: 12px;
+}
+
+.select-wrapper select {
+    width: 100%;
+    padding-right: 30px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: transparent;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.select-wrapper select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}

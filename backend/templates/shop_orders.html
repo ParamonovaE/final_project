@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заказы поставщика</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/order.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>Заказы поставщика</h2>
+
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="/shop-products/" class="btn-primary">На главную</a>
+        </div>
+
+        <form method="get" action="{% url 'shop-orders' %}" class="filter-form">
+            <label for="status">Фильтр по статусу:</label>
+            <select name="status" id="status">
+                <option value="">Все статусы</option>
+                {% for value, label in Order.STATUS_CHOICES %}
+                    <option value="{{ value }}" {% if value == request.GET.status %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit">Применить</button>
+        </form>
+
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% else %}
+            <table id="orders-table">
+                <thead>
+                    <tr>
+                        <th>Номер заказа</th>
+                        <th>Дата</th>
+                        <th>Статус</th>
+                        <th>Общая сумма</th>
+                        <th>Детали</th>
+                        <th>Изменить статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order_data in orders %}
+                        <tr>
+                            <td>{{ order_data.order.id }}</td>
+                            <td>{{ order_data.order.dt|date:"d.m.Y" }}</td>
+                            <td>{{ order_data.order.get_status_display }}</td>
+                            <td>{{ order_data.total_price }} руб.</td>
+                            <td>
+                                <a href="{% url 'shop-order-details' order_data.order.id %}" class="btn-details">Подробнее</a>
+                            </td>
+                            <td>
+                                <div class="select-wrapper">
+                                    <select class="status-select" data-order-id="{{ order_data.order.id }}">
+                                        {% for value, label in order_data.order.STATUS_CHOICES %}
+                                            <option value="{{ value }}" {% if value == order_data.order.status %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">Заказов нет.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+
+    <script>
+        // обработчик изменения статуса заказа
+        $(document).ready(function() {
+            $('.status-select').change(function() {
+                const orderId = $(this).data('order-id');
+                const newStatus = $(this).val();
+
+                $.ajax({
+                    url: `/api/shop/orders/`,
+                    method: 'PATCH',
+                    headers: {
+                        "Authorization": `Token ${localStorage.getItem("token")}`
+                    },
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        order_id: orderId,
+                        status: newStatus
+                    }),
+                    success: function(response) {
+                        alert(`Статус заказа успешно обновлен: ${response.new_status}`);
+                        location.reload();
+                    },
+                    error: function(xhr, status, error) {
+                        alert(`Ошибка при обновлении статуса: ${xhr.responseJSON.error}`);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

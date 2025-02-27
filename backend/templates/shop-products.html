@@ -12,8 +12,19 @@
         <h2>Управление товарами</h2>
         <div class="actions">
             <button id="upload-btn">Загрузить товары</button>
+            <button id="toggle-orders-btn" class="btn-primary">
+            {% if shop.is_active %}
+                Отключить приём заказов
+            {% else %}
+                Включить приём заказов
+            {% endif %}
+        </button>
         </div>
         <input type="file" id="file-input" style="display: none;">
+
+        <div style="text-align: right; margin-bottom: 20px;">
+            <a href="/shop_orders/" class="btn-primary">Заказы от покупателей</a>
+        </div>
 
         <div id="products-container">
             <h3>Ваши товары</h3>
@@ -26,6 +37,61 @@
             const uploadBtn = document.getElementById("upload-btn");
             const fileInput = document.getElementById("file-input");
             const productList = document.getElementById("product-list");
+            const toggleOrdersBtn = document.getElementById("toggle-orders-btn");
+
+             // функция для загрузки текущего статуса приёма заказов
+            function loadOrderAcceptanceStatus() {
+                const token = localStorage.getItem("token");
+
+                fetch("/api/shop/status/", {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Token ${token}`,
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.is_active) {
+                        toggleOrdersBtn.textContent = 'Отключить приём заказов';
+                    } else {
+                        toggleOrdersBtn.textContent = 'Включить приём заказов';
+                    }
+                })
+                .catch(error => console.error("Ошибка загрузки статуса", error));
+            }
+
+            // обработчик для кнопки включения/отключения приёма заказов
+            toggleOrdersBtn.addEventListener("click", function () {
+                const token = localStorage.getItem("token");
+
+                fetch("/api/shop/status/", {
+                    method: 'POST',
+                    headers: {
+                        "Authorization": `Token ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (data.is_active) {
+                            toggleOrdersBtn.textContent = 'Отключить приём заказов';
+                        } else {
+                            toggleOrdersBtn.textContent = 'Включить приём заказов';
+                        }
+                        alert('Статус приёма заказов обновлён');
+                    } else {
+                        alert('Ошибка: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Ошибка:', error);
+                    alert('Ошибка при обновлении статуса приёма заказов');
+                });
+            });
+
+            // загружаем текущий статус приёма заказов при загрузке страницы
+            loadOrderAcceptanceStatus();
 
             function loadProducts() {
                 const token = localStorage.getItem("token");

@@ -46,6 +46,7 @@ class Shop(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Название магазина")
     url = models.URLField(max_length=300, unique=True, help_text="Введите полный URL, включая https://", null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="shop", verbose_name="Пользователь", null=True, blank=True)
+    is_active = models.BooleanField(default=True, verbose_name="Статус приема заказов")
 
     class Meta:
         verbose_name = 'Магазин'

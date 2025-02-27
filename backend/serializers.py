@@ -206,7 +206,8 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'user', 'status', 'items']
+        fields = ['id', 'user', 'status', 'items', 'dt', 'contact']
+        read_only_fields = ['id', 'user', 'dt', 'contact']
 
 class CreateOrderSerializer(serializers.Serializer):
     selected_items = serializers.ListField(child=serializers.IntegerField())

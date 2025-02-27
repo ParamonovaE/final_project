@@ -185,10 +185,11 @@
                 })
                 .then(response => response.json())
                 .then(data => {
+                    const productList = document.getElementById("product-list");
                     productList.innerHTML = "";
 
                     if (data.length === 0) {
-                        productList.innerHTML = "<p>Товары не найдены</p>";
+                        productList.innerHTML = "<p>Товары временно недоступны.</p>";
                         return;
                     }
 
