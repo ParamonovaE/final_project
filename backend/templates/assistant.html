@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ассистент по покупкам</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'backend/assistant.css' %}">
+</head>
+<body>
+    <div class="assistant-container">
+        <div class="header-nav">
+            <div class="nav-left">
+                <a href="/customer-products/" class="btn-primary"><i class="fas fa-home"></i> Вернуться на главную</a>
+            </div>
+            <div class="nav-right">
+                <a href="/orders/" class="btn-primary"><i class="fas fa-clipboard-list"></i> Мои заказы</a>
+                <a href="/basket/" class="btn-primary">
+                    <i class="fas fa-shopping-cart"></i> Корзина <span id="basket-counter">0</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="chat-header">
+            <h2>🛍️ AI-Ассистент по покупкам</h2>
+            <p>Опишите, что вы ищете (например: "Подарок на 8 марта до 5000 ₽", "Подбери товары для спорта" или "Найди товары к чаю")</p>
+        </div>
+
+        <div class="chat-wrapper">
+            <div class="chat-window" id="chatWindow">
+                <div class="message assistant">
+                    <p>Привет, меня зовут Константин! Я AI-ассистент, и помогу тебе быстро подобрать товары по твоему запросу. Что вы ищете?</p>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="Ваш запрос" autofocus>
+                <button id="sendButton"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <div class="products-grid" id="productsGrid">
+            <!-- Товары будут здесь -->
+        </div>
+    </div>
+
+    <script>
+        // Функция для получения CSRF токена
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Функция для обновления счетчика корзины
+        function updateBasketCounter() {
+            const token = localStorage.getItem("token");
+            if (!token) return;
+
+            fetch("/api/basket/", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const basketCounter = document.getElementById("basket-counter");
+                if (basketCounter) {
+                    basketCounter.textContent = data.items.length;
+                }
+            })
+            .catch(error => console.error("Ошибка при обновлении счетчика корзины:", error));
+        }
+
+        // Функция добавления в корзину
+        function addToBasket(productId) {
+            const token = localStorage.getItem("token");
+            if (!token) {
+                alert("Пожалуйста, авторизуйтесь для добавления товаров в корзину.");
+                window.location.href = "/login/";
+                return;
+            }
+
+            const data = {
+                product_info_id: productId,
+                quantity: 1
+            };
+
+            fetch("/api/basket/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Token ${token}`,
+                    "X-CSRFToken": getCookie("csrftoken")
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new Error("Ошибка при добавлении товара в корзину.");
+                }
+            })
+            .then(data => {
+                if (data.Status === true && data.Message === "Этот товар уже в корзине") {
+                    alert("Этот товар уже в корзине.");
+                } else {
+                    alert("Товар добавлен в корзину!");
+                    updateBasketCounter();
+                }
+            })
+            .catch(error => {
+                alert(error.message);
+            });
+        }
+
+        // Инициализация чата
+        document.addEventListener("DOMContentLoaded", function() {
+            const chatWindow = document.getElementById("chatWindow");
+            const userInput = document.getElementById("userInput");
+            const sendButton = document.getElementById("sendButton");
+            const productsGrid = document.getElementById("productsGrid");
+
+            // Обновляем счетчик корзины при загрузке
+            updateBasketCounter();
+
+            function addMessage(text, isUser) {
+                const messageDiv = document.createElement("div");
+                messageDiv.className = `message ${isUser ? "user" : "assistant"}`;
+
+                // Ограничиваем длину сообщения
+                const maxLength = 60;
+                const displayText = text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+
+                messageDiv.innerHTML = `<p>${displayText}</p>`;
+                chatWindow.appendChild(messageDiv);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+
+            function showLoading() {
+                const loadingDiv = document.createElement("div");
+                loadingDiv.className = "message assistant loading-message";
+                loadingDiv.innerHTML = "<p><i class='fas fa-spinner fa-spin'></i> Ищу товары...</p>";
+                chatWindow.appendChild(loadingDiv);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                return loadingDiv;
+            }
+
+            function showProducts(products) {
+                productsGrid.innerHTML = '';
+
+                if (!products || products.length === 0) {
+                    productsGrid.innerHTML = `
+                        <div class="no-products">
+                            <p>К сожалению, ничего не найдено. Попробуйте изменить запрос.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                products.forEach(product => {
+                    const productCard = document.createElement("div");
+                    productCard.className = "product-card";
+
+                    productCard.innerHTML = `
+                        <div class="product-image">
+                            <i class="fas fa-box-open"></i>
+                        </div>
+                        <div class="product-info">
+                            <h4 class="product-name">${product.product_name}</h4>
+                            <div class="product-price">${product.price.toLocaleString('ru-RU')} ₽</div>
+                            <div class="product-shop">${product.shop}</div>
+                            <button onclick="addToBasket(${product.id})" class="add-to-cart">
+                                <i class="fas fa-cart-plus"></i> В корзину
+                            </button>
+                        </div>
+                    `;
+
+                    productsGrid.appendChild(productCard);
+                });
+            }
+
+            sendButton.addEventListener("click", async function() {
+                const query = userInput.value.trim();
+                if (!query) return;
+
+                addMessage(query, true);
+                userInput.value = "";
+                const loadingDiv = showLoading();
+
+                try {
+                    const response = await fetch("/api/assistant/", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCookie("csrftoken")
+                        },
+                        body: JSON.stringify({ query: query })
+                    });
+
+                    const data = await response.json();
+                    loadingDiv.remove();
+
+                    if (data.products && data.products.length > 0) {
+                        addMessage(`Найдено ${data.products.length} вариантов:`, false);
+                        showProducts(data.products);
+                    } else {
+                        addMessage("Ничего не найдено. Попробуйте изменить запрос.", false);
+                    }
+                } catch (error) {
+                    console.error("Ошибка:", error);
+                    loadingDiv.innerHTML = "<p>Произошла ошибка. Пожалуйста, попробуйте позже.</p>";
+                }
+            });
+
+            // Отправка по Enter
+            userInput.addEventListener("keypress", function(e) {
+                if (e.key === "Enter") {
+                    sendButton.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
