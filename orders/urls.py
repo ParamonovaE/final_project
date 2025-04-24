@@ -21,7 +21,7 @@ from backend.views import RegisterView, VerifyEmailView, LoginAccount, ResetPass
     main_depends_role, shop_products_view, ShopProductView, customer_products_view, CustomerProductsView, \
     CategoryListView, CategoryParametersView, basket_view, BasketView, OrderView, order_history_view, \
     order_detail_view, ContactView, ShopOrdersView, shop_order_history_view, shop_order_detail_view, \
-    ShopStatusView
+    ShopStatusView, assistant_view, assistant_api
 
 urlpatterns = [
     path('', lambda request: redirect('login/')),
@@ -54,5 +54,7 @@ urlpatterns = [
     path('api/shop/orders/', ShopOrdersView.as_view(), name='shop-orders-api'),
     # path('api/shop/toggle-active-orders/', ToggleAcceptingOrdersView.as_view(), name='toggle-active-orders-api'),
     path('api/shop/status/', ShopStatusView.as_view(), name='shop-status'),
+    path('assistant/', assistant_view, name='assistant'),
+    path('api/assistant/', assistant_api, name='assistant_api'),
 ]
 
