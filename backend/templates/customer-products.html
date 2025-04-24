@@ -9,48 +9,94 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h2>Каталог товаров</h2>
-
-        <div style="text-align: right; margin-bottom: 20px;">
-            <a href="/orders/" class="btn-primary">Мои заказы</a>
-            <a href="/basket/" class="btn-primary">Корзина <span id="basket-counter">0</span></a>
-            <i class="fas fa-shopping-cart"></i>
+    <div class="main-container">
+        <div class="header-nav">
+            <div class="logo-title">
+                <img src="{% static 'images/people-logo-design_93835-1043.jpg' %}" alt="Easymarket Logo" class="logo">
+                <div class="logo-catalog">
+                    <h1>Каталог товаров</h1>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="/orders/" class="btn-primary"><i class="fas fa-clipboard-list"></i> Мои заказы</a>
+                <a href="/basket/" class="btn-primary">
+                    <i class="fas fa-shopping-cart"></i> Корзина <span id="basket-counter">0</span>
+                </a>
+            </div>
         </div>
-
-        <div class="filters">
+        <div class="search-section">
             <div class="filter-group">
-                <input type="text" id="product-name" placeholder="Название товара">
-                <i class="fas fa-search"></i>
-            </div>
-            <div class="filter-group">
-                <input type="text" id="shop-name" placeholder="Поставщик">
-                <i class="fas fa-store"></i>
-            </div>
-            <div class="filter-group">
-                <input type="number" id="min-price" placeholder="Минимальная цена">
-                <input type="number" id="max-price" placeholder="Максимальная цена">
-                <i class="fas fa-dollar-sign"></i>
-            </div>
-            <div class="filter-group">
-                <select id="category-select">
-                    <option value="">Выберите каталог</option>
-                </select>
-                <i class="fas fa-list"></i>
-            </div>
-            <div id="category-filters" class="category-filters"></div>
-            <div class="filter-buttons">
-                <button id="apply-filters" class="btn-primary">Применить фильтры</button>
-                <button id="reset-filters" class="btn-secondary">Сбросить фильтры</button>
+                <label for="product-name"><i class="fas fa-search"></i> Поиск по названию</label>
+                <input type="text" id="product-name" placeholder="Поиск...">
             </div>
         </div>
 
-        <div id="products-container">
-            <h3>Все товары</h3>
-            <ul id="product-list"></ul>
+        <div class="content-wrapper">
+            <div class="left-sidebar">
+                <div class="filters-section">
+                    <h3><i class="fas fa-filter fa-lg"></i> Фильтры</h3>
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label for="shop-name"><i class="fas fa-store"></i> Поставщик</label>
+                            <input type="text" id="shop-name" placeholder="Введите поставщика...">
+                        </div>
+
+                        <div class="filter-group">
+                            <label><i class="fas fa-tag"></i> Цена</label>
+                            <div class="price-range">
+                                <input type="number" id="min-price" placeholder="От">
+                                <span>-</span>
+                                <input type="number" id="max-price" placeholder="До">
+                            </div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label for="category-select"><i class="fas fa-list"></i> Категория</label>
+                            <select id="category-select">
+                                <option value="">Все категории</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="category-filters" class="category-filters"></div>
+
+                    <div class="filter-buttons">
+                        <button id="apply-filters" class="btn-primary">
+                            <i class="fas fa-check"></i> Применить
+                        </button>
+                        <button id="reset-filters" class="btn-secondary">
+                            <i class="fas fa-times"></i> Сбросить
+                        </button>
+                    </div>
+                </div>
+
+                <div class="assistant-banner">
+                    <div class="assistant-card">
+                        <div class="assistant-icon">
+                            <img src="{% static 'images/robot.jpg' %}">
+                        </div>
+                        <div class="assistant-content">
+                            <h3>AI-Ассистент Константин</h3>
+                            <p>Поможет с выбором</p>
+                            <a href="{% url 'assistant' %}" class="btn btn-assistant">
+                                <i class="fas fa-comment-alt"></i> Открыть
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="products-main">
+                <div class="products-section">
+                    <h3><i class="fas fa-box-open fa-lg"></i> Все товары</h3>
+                    <div id="product-list" class="products-grid"></div>
+                </div>
+            </div>
         </div>
 
-        <button onclick="window.location.href='/main_depends/'" class="btn-back">Вернуться назад</button>
+        <button onclick="window.location.href='/main_depends/'" class="btn-back">
+            <i class="fas fa-arrow-left"></i> Вернуться назад
+        </button>
     </div>
 
     <script>
@@ -173,6 +219,29 @@
                 })
                 .catch(error => console.error("Ошибка загрузки параметров", error));
             });
+            const productNameInput = document.getElementById("product-name");
+
+            productNameInput.addEventListener("keypress", function(e) {
+                if (e.key === "Enter") {  // проверка на клавишу Enter
+                    const filters = {
+                        product_name: productNameInput.value,
+                        shop_name: document.getElementById("shop-name").value,
+                        min_price: document.getElementById("min-price").value,
+                        max_price: document.getElementById("max-price").value,
+                        category: document.getElementById("category-select").value,
+                    };
+
+                    // фильтры по характеристикам
+                    const paramInputs = document.getElementById("category-filters").querySelectorAll("input");
+                    paramInputs.forEach(input => {
+                        if (input.value) {
+                            filters[input.id] = input.value;
+                        }
+                    });
+
+                    loadProducts(filters);
+                }
+            });
 
             // загрузка товаров с учётом фильтров
             function loadProducts(filters = {}) {
@@ -197,9 +266,12 @@
                         const li = document.createElement("li");
                         li.classList.add("product-item");
                         li.innerHTML = `
+                            <div class="product-image">
+                                <i class="fas fa-box-open"></i>
+                            </div>
                             <div class="product-header">
                                 <h3 class="product-name">${product.product_name}</h3>
-                                <span class="product-price">${product.price} руб.</span>
+                                <span class="product-price">${product.price} ₽</span>
                             </div>
                             <div class="product-details">
                                 <p class="product-shop"><strong>Поставщик:</strong> ${product.shop_name}</p>
