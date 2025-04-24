@@ -30,7 +30,7 @@
                                 <h3>{{ item.product_info.product.name }}</h3>
                             </label>
                             <p>Магазин: {{ item.product_info.shop.name }}</p>
-                            <p>Цена за единицу: {{ item.product_info.price }} руб.</p>
+                            <p>Цена за единицу: {{ item.product_info.price }} ₽</p>
                             <div class="quantity-controls">
                                 <button type="button"
                                         onclick="updateQuantity({{ item.id }}, -1)"
@@ -42,7 +42,7 @@
                                         class="btn-quantity"
                                         {% if not item.is_shop_active_orders %}disabled{% endif %}>+</button>
                             </div>
-                            <p>Общая стоимость: <span class="total-price">{{ item.total_price }}</span> руб.</p>
+                            <p>Общая стоимость: <span class="total-price">{{ item.total_price }}</span> ₽</p>
                             <button type="button"
                                     onclick="removeFromBasket({{ item.id }})"
                                     class="btn-danger"
