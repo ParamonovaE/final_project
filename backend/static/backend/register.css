@@ -72,3 +72,14 @@ select {
     background: white;
     font-size: 16px;
 }
+
+.logo-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.logo-image {
+    height: 160px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
