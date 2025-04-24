@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Управление товарами</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     {% load static %}
     <link rel="stylesheet" href="{% static 'backend/shop.css' %}">
 </head>
 <body>
     <div class="container">
+        <div class="logo-header">
+            <img src="{% static 'images/people-logo-design_93835-1043.jpg' %}" alt="EASYMARKET Logo" class="logo-image">
+        </div>
         <h2>Управление товарами</h2>
         <div class="actions">
             <button id="upload-btn">Загрузить товары</button>
@@ -122,9 +126,12 @@
                                 const li = document.createElement("li");
                                 li.classList.add("product-item");
                                 li.innerHTML = `
+                                    <div class="product-image">
+                                        <i class="fas fa-box-open"></i>
+                                    </div>
                                     <div class="product-header">
                                         <h3 class="product-name">${product.product_name}</h3>
-                                        <span class="product-price">${product.price} руб.</span>
+                                        <span class="product-price">${product.price} ₽</span>
                                     </div>
                                     <div class="product-details">
                                         <p class="product-shop"><strong>Поставщик:</strong> ${product.shop_name || "Не указано"}</p>
