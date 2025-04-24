@@ -170,6 +170,7 @@ h2, h3 {
 
 #new-address-fields {
     margin-top: 15px;
+    max-width: 1150px;
 }
 
 #new-address-fields label {
