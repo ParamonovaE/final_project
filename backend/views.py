@@ -27,6 +27,9 @@ from rest_framework import status
 import yaml
 from .models import Product, ProductInfo, Parameter, ProductParameter, Shop
 from .permissions import IsSupplier
+from sentence_transformers import SentenceTransformer
+import torch
+import pandas as pd
 
 @login_required
 def main_depends_role(request):
@@ -677,3 +680,92 @@ class ShopStatusView(APIView):
             return Response({'status': 'success', 'is_active': shop.is_active})
         except Shop.DoesNotExist:
             return Response({'status': 'error', 'message': 'Вы не являетесь поставщиком'}, status=status.HTTP_404_NOT_FOUND)
+
+class GiftAssistant:
+    def __init__(self):
+        self.sbert_model = SentenceTransformer(r"C:\Users\USER\Downloads\sbert_contextual3")
+
+        # загружаем товары из базы данных
+        self.products = []
+        self.texts = []
+
+        for info in ProductInfo.objects.select_related("product", "shop").prefetch_related("parameters__parameter"):
+            name = info.product.name
+            shop = info.shop.name
+            price = info.price
+
+            parameters = ", ".join([
+                f"{pp.parameter.name}: {pp.value}"
+                for pp in info.parameters.all()
+            ])
+
+            text = f"{name}. Магазин: {shop}. {parameters}. Цена: {price} руб."
+
+            self.products.append({
+                "id": info.id,
+                "product_name": name,
+                "price": float(price),
+                "shop": shop,
+                "text": text,
+            })
+            self.texts.append(text)
+
+    def extract_price_limit(self, query):
+        match = re.search(r'до\s*(\d{3,})', query)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def find_similar_products(self, query, top_k=9):
+        price_limit = self.extract_price_limit(query)
+
+        filtered = self.products
+        if price_limit:
+            filtered = [p for p in self.products if p['price'] <= price_limit]
+
+        if not filtered:
+            return []
+
+        texts = [p['text'] for p in filtered]
+
+        query_embedding = self.sbert_model.encode(query, convert_to_tensor=True)
+        product_embeddings = self.sbert_model.encode(texts, convert_to_tensor=True)
+        cos_scores = torch.nn.functional.cosine_similarity(query_embedding, product_embeddings)
+        top_results = torch.topk(cos_scores, k=min(top_k, len(filtered)))
+
+        return [
+            {
+                "id": filtered[i.item()]['id'],
+                "product_name": filtered[i.item()]['product_name'],
+                "price": filtered[i.item()]['price'],
+                "shop": filtered[i.item()]['shop'],
+            }
+            for i in top_results.indices
+        ]
+
+    def process_request(self, user_query):
+        products = self.find_similar_products(user_query)
+        return {
+            'products': products
+        }
+
+# инициализация ассистента (один раз при запуске сервера)
+assistant = GiftAssistant()
+
+# View для обработки запросов
+@csrf_exempt
+def assistant_api(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_query = data.get('query', '')
+            if not user_query:
+                return JsonResponse({'error': 'Query is required'}, status=400)
+            result = assistant.process_request(user_query)
+            return JsonResponse(result)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Only POST method is allowed'}, status=405)
+
+def assistant_view(request):
+    return render(request, 'assistant.html')
