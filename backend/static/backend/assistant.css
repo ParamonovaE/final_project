@@ -1,0 +1,280 @@
+body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f7fa;
+    color: #333;
+}
+
+.assistant-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/*.header-nav {
+    text-align: right;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+}*/
+
+.header-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+}
+.nav-left {
+    display: flex;
+    gap: 10px;
+}
+.nav-right {
+     display: flex;
+     gap: 10px;
+}
+
+.btn-primary {
+    background-color: #0069d9;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    text-decoration: none;
+    display: inline-block;
+    margin-left: 10px;
+    transition: all 0.3s;
+    font-size: 14px;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background-color: #3a5a80;
+    transform: translateY(-1px);
+}
+
+.fa-shopping-cart {
+    margin-left: 5px;
+    color: white;
+}
+
+#basket-counter {
+    color: white;
+}
+
+.chat-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.chat-header h2 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 1.5rem;
+}
+
+.chat-header p {
+    color: #34495e;
+    font-size: 1.0rem;
+    margin: 0;
+}
+
+.chat-wrapper {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.chat-window {
+    height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #fafafa;
+    border-radius: 8px;
+}
+
+.message {
+    margin-bottom: 12px;
+    padding: 10px 15px;
+    border-radius: 18px;
+    max-width: 70%;
+    line-height: 1.4;
+    font-size: 0.9rem;
+    position: relative;
+    animation: fadeIn 0.3s ease;
+}
+
+.message.user {
+    background: #0069d9;
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 5px;
+    max-width: 80%;
+}
+
+.message.assistant {
+    background: #eaeff5;
+    color: #333;
+    margin-right: auto;
+    border-bottom-left-radius: 5px;
+    max-width: 80%;
+}
+
+.loading-message {
+    color: #7f8c8d;
+}
+
+.loading-message .fa-spinner {
+    margin-right: 8px;
+}
+
+.input-area {
+    display: flex;
+    gap: 10px;
+}
+
+.input-area input {
+    flex: 1;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 24px;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s;
+}
+
+.input-area input:focus {
+    border-color: #0069d9;
+    box-shadow: 0 0 0 2px rgba(74, 111, 165, 0.2);
+}
+
+.input-area button {
+    width: 50px;
+    background: #0069d9;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.input-area button:hover {
+    background: #3a5a80;
+    transform: translateY(-1px);
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.product-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.product-image {
+    height: 180px;
+    background: #f5f7fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4a6fa5;
+    font-size: 3rem;
+}
+
+.product-info {
+    padding: 15px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.product-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #2c3e50;
+}
+
+.product-price {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #e74c3c;
+    margin-bottom: 8px;
+}
+
+.product-shop {
+    font-size: 0.85rem;
+    color: #7f8c8d;
+    margin-bottom: 15px;
+}
+
+.add-to-cart {
+    margin-top: auto;
+    width: 100%;
+    padding: 10px;
+    background: #0069d9;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.add-to-cart:hover {
+    background: #3a5a80;
+}
+
+.no-products {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 30px;
+    color: #7f8c8d;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+    .assistant-container {
+        padding: 15px;
+    }
+
+    .products-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chat-window {
+        height: 250px;
+    }
+
+    .message {
+        max-width: 85%;
+    }
+}
