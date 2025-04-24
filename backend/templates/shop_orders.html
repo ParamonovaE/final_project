@@ -50,7 +50,7 @@
                             <td>{{ order_data.order.id }}</td>
                             <td>{{ order_data.order.dt|date:"d.m.Y" }}</td>
                             <td>{{ order_data.order.get_status_display }}</td>
-                            <td>{{ order_data.total_price }} руб.</td>
+                            <td>{{ order_data.total_price }} ₽</td>
                             <td>
                                 <a href="{% url 'shop-order-details' order_data.order.id %}" class="btn-details">Подробнее</a>
                             </td>
