@@ -81,3 +81,14 @@ label {
 .forgot-password:hover {
     text-decoration: underline;
 }
+
+.logo-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.logo-image {
+    height: 160px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+}
